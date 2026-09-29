@@ -12,4 +12,8 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.28.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TodayInSpace.Core\TodayInSpace.Core.csproj" />
+  </ItemGroup>
+
 </Project>

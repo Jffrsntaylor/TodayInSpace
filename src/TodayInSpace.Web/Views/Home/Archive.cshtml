@@ -179,9 +179,9 @@
                 <section class="apod">
                     <div class="section-label">Astronomy Picture of the Day</div>
                     <div class="apod-frame">
-                        @if (!string.IsNullOrEmpty(Model.Apod.ImageUrl))
+                        @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
                         {
-                            <img src="@Model.Apod.ImageUrl" alt="@Model.Apod.Title" />
+                            <img src="@imageSrc" alt="@Model.Apod.Title" />
                         }
                     </div>
                     <h2>@Model.Apod.Title</h2>

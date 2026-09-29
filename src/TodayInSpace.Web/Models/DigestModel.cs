@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace TodayInSpace.Web.Models
 {
@@ -29,6 +29,15 @@ namespace TodayInSpace.Web.Models
 
         [JsonPropertyName("copyright")]
         public string? Copyright { get; set; }
+
+        // Our archived copy in the "images" container, e.g. "2026-09-28.jpg".
+        // Older digests won't have this until the backfill runs.
+        [JsonPropertyName("imageBlob")]
+        public string? ImageBlob { get; set; }
+
+        // NASA's original image URL.
+        [JsonPropertyName("sourceImageUrl")]
+        public string? SourceImageUrl { get; set; }
     }
 
     // Space weather section

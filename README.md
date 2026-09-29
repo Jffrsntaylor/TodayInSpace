@@ -8,6 +8,7 @@ A daily astronomy and space-weather digest. Each morning a scheduled Azure Funct
 - **Space weather at a glance**: current Kp index, aurora chance, and solar wind speed, color-coded by severity
 - **3-day Kp forecast** bar chart
 - **Archive**: pick any past date to see that day's digest
+- **Self-hosted image archive**: each day's picture is copied into our own storage, so the archive keeps working even when NASA changes its URLs (as it did when APOD moved from apod.nasa.gov to science.nasa.gov/apod)
 
 ## Architecture
 
@@ -15,14 +16,25 @@ A daily astronomy and space-weather digest. Each morning a scheduled Azure Funct
 flowchart LR
     NASA[NASA APOD API] --> F
     NOAA[NOAA SWPC feeds] --> F
-    F["Azure Function<br/>(timer, daily 10:00 UTC)"] -->|"YYYY-MM-DD.json<br/>latest.json"| B[(Azure Blob Storage)]
+    F["Azure Function<br/>(timer, daily 10:00 UTC)"] -->|"digests/YYYY-MM-DD.json<br/>images/YYYY-MM-DD.jpg"| B[(Azure Blob Storage)]
     B --> W[ASP.NET Core MVC site<br/>Azure App Service]
     W --> U((Visitors))
 ```
 
 - `src/TodayInSpace.Function` — .NET 8 isolated-worker Azure Function. Fetches APOD, current Kp, solar wind, and the Kp forecast, then writes a dated JSON digest plus `latest.json` to blob storage. Non-critical feeds degrade gracefully (the digest still publishes without them).
-- `src/TodayInSpace.Web` — .NET 10 ASP.NET Core MVC site. Reads digests from blob storage; no database, no accounts.
-- `tests/TodayInSpace.Web.Tests` — xUnit tests for the space-weather classification logic the views use.
+- `src/TodayInSpace.Web` — .NET 10 ASP.NET Core MVC site. Reads digests from blob storage and serves archived images at `/images/{date}.{ext}` (storage stays private; responses are cacheable for a year since a day's image never changes). No database, no accounts.
+- `src/TodayInSpace.Core` — shared logic used by both apps (image naming/validation).
+- `tests/TodayInSpace.Web.Tests` — xUnit tests for the space-weather classification and image naming/fallback logic.
+
+### Image archive backfill
+
+`BackfillImages` is an HTTP-triggered function (protected by a function key) that copies images for digests saved before archiving existed. It works in batches and is safe to re-run:
+
+```
+GET https://<function-app>.azurewebsites.net/api/backfill-images?code=<function key>&max=20
+```
+
+Repeat until the response shows `"remaining": 0`. Days whose image can no longer be downloaded are listed under `failed` and keep NASA's link.
 
 Decoupling ingestion (Function) from display (web app) means the site never calls NASA or NOAA on a page load: pages stay fast, API rate limits don't matter, and every day's data is preserved for the archive.
 
@@ -39,7 +51,7 @@ dotnet run
 
 For fully offline development you can use [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) with the connection string `UseDevelopmentStorage=true`.
 
-The function reads `NASA_API_KEY`, `Storage__ConnectionString`, and `Storage__ContainerName` from environment variables / `local.settings.json` (git-ignored).
+The function reads `NASA_API_KEY`, `Storage__ConnectionString`, `Storage__ContainerName`, and optionally `Storage__ImagesContainerName` (default `images`) from environment variables / `local.settings.json` (git-ignored).
 
 Run the tests:
 
