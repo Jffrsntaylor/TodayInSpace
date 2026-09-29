@@ -46,6 +46,9 @@ jobs:
         with:
           name: function
           path: out/function
+          # The isolated worker needs the hidden .azurefunctions folder; without it the
+          # host loads 0 functions. upload-artifact skips hidden files by default.
+          include-hidden-files: true
 
   # Deploys on pushes to main (or a manual "Run workflow"), and only once the Azure secrets/variables are set
   # (see README > Deploying). Until then this job is skipped instead of failing.
