@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
+using TodayInSpace.Core;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
@@ -104,24 +105,17 @@ namespace TodayInSpace.Function
                 _logger.LogWarning("Kp fetch failed: {msg}. Continuing without it.", ex.Message);
             }
 
-            // ---- 3. NOAA solar wind speed (plasma) ----
-            // plasma-1-day.json is array-of-arrays; row 0 is the header.
-            // Columns: ["time_tag","density","speed","temperature"]
+            // ---- 3. NOAA solar wind speed ----
+            // NOAA retired products/solar-wind/plasma-1-day.json; the summary feed gives the
+            // latest real-time proton speed: [{"proton_speed": 412, "time_tag": "..."}]
             int? solarWindSpeed = null;
             try
             {
-                string plasmaJson = await http.GetStringAsync(
-                    "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json");
-                using var doc = JsonDocument.Parse(plasmaJson);
-                var rows = doc.RootElement;
-                if (rows.GetArrayLength() > 1)
-                {
-                    var lastRow = rows[rows.GetArrayLength() - 1];
-                    // index 2 = speed
-                    string speedStr = lastRow[2].GetString() ?? "";
-                    if (double.TryParse(speedStr, out double spd))
-                        solarWindSpeed = (int)Math.Round(spd);
-                }
+                string windJson = await http.GetStringAsync(
+                    "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json");
+                solarWindSpeed = NoaaParsers.ParseSolarWindSpeed(windJson);
+                if (solarWindSpeed == null)
+                    _logger.LogWarning("Solar wind feed returned no usable speed.");
             }
             catch (Exception ex)
             {
