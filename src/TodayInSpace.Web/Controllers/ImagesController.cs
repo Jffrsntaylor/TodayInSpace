@@ -14,14 +14,15 @@ namespace TodayInSpace.Web.Controllers
         }
 
         [HttpGet("/images/{name}")]
-        // An archived day's image never changes, so browsers and CDNs can cache it for a year.
-        [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> Get(string name)
         {
             var image = await _digestService.OpenImageAsync(name);
             if (image == null)
                 return NotFound();
 
+            // An archived day's image never changes, so browsers and CDNs can cache it for a year.
+            // (Set only on success so a 404 isn't cached.)
+            Response.Headers.CacheControl = "public, max-age=31536000, immutable";
             return File(image.Value.Content, image.Value.ContentType);
         }
     }
