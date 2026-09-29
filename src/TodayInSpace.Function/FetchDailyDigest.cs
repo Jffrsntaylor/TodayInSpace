@@ -41,39 +41,26 @@ namespace TodayInSpace.Function
 
             string today = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
+            var containerClient = new BlobContainerClient(connStr, container);
+
             // ---- 1. NASA APOD ----
-            ApodInfo apod;
-            try
+            // If NASA's API is down, don't lose the whole day: still publish the space weather
+            // and carry over the last good picture (its own "date" tells the site it's from earlier).
+            ApodInfo? apod = await FetchApodAsync(nasaKey, today);
+            bool apodIsFresh = apod != null;
+            if (apod == null)
             {
-                string apodUrl = $"https://api.nasa.gov/planetary/apod?api_key={nasaKey}";
-                string apodJson = await http.GetStringAsync(apodUrl);
-                using var doc = JsonDocument.Parse(apodJson);
-                var root = doc.RootElement;
-
-                string mediaType = GetString(root, "media_type");
-                // APOD is sometimes a video. If so, we still keep title/explanation
-                // but leave the image URL empty (the UI shows a graceful fallback).
-                string imageUrl = mediaType == "image" ? GetString(root, "url") : "";
-
-                apod = new ApodInfo
-                {
-                    title          = GetString(root, "title"),
-                    explanation    = GetString(root, "explanation"),
-                    imageUrl       = imageUrl,
-                    sourceImageUrl = imageUrl,
-                    copyright      = GetString(root, "copyright")
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("APOD fetch failed: {msg}. Aborting (no headline image).", ex.Message);
-                return;  // APOD is the headline; if it fails, skip today's digest
+                apod = await LoadPreviousApodAsync(containerClient);
+                _logger.LogWarning(apod != null
+                    ? "APOD unavailable; carrying over the picture from {date}."
+                    : "APOD unavailable and no previous picture found; publishing space weather only.",
+                    apod?.date);
             }
 
             // ---- 1b. Keep our own copy of the image ----
             // NASA's image URLs have changed before; the archive shouldn't depend on them.
             // If this fails the digest still publishes with NASA's link.
-            if (!string.IsNullOrEmpty(apod.imageUrl))
+            if (apodIsFresh && apod != null && !string.IsNullOrEmpty(apod.imageUrl))
             {
                 var images = ImageArchiver.GetContainer(connStr);
                 apod.imageBlob = await ImageArchiver.ArchiveAsync(images, today, apod.imageUrl, _logger);
@@ -200,7 +187,6 @@ namespace TodayInSpace.Function
             // ---- 6. Write two blobs: today's dated file AND latest.json ----
             try
             {
-                var containerClient = new BlobContainerClient(connStr, container);
                 await containerClient.CreateIfNotExistsAsync();
 
                 await UploadAsync(containerClient, $"{today}.json", digestJson);
@@ -211,6 +197,68 @@ namespace TodayInSpace.Function
             catch (Exception ex)
             {
                 _logger.LogError("Blob write failed: {msg}", ex.Message);
+            }
+        }
+
+        // Calls NASA's APOD API, trying twice with a short pause. Returns null if it's unavailable.
+        private async Task<ApodInfo?> FetchApodAsync(string nasaKey, string today)
+        {
+            string apodUrl = $"https://api.nasa.gov/planetary/apod?api_key={nasaKey}";
+            for (int attempt = 1; attempt <= 2; attempt++)
+            {
+                try
+                {
+                    string apodJson = await http.GetStringAsync(apodUrl);
+                    using var doc = JsonDocument.Parse(apodJson);
+                    var root = doc.RootElement;
+
+                    // APOD is sometimes a video. If so, we still keep title/explanation
+                    // but leave the image URL empty (the UI shows a graceful fallback).
+                    string imageUrl = GetString(root, "media_type") == "image" ? GetString(root, "url") : "";
+                    string apodDate = GetString(root, "date");
+
+                    return new ApodInfo
+                    {
+                        title          = GetString(root, "title"),
+                        explanation    = GetString(root, "explanation"),
+                        imageUrl       = imageUrl,
+                        sourceImageUrl = imageUrl,
+                        copyright      = GetString(root, "copyright"),
+                        date           = string.IsNullOrEmpty(apodDate) ? today : apodDate
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("APOD fetch attempt {attempt} failed: {msg}", attempt, ex.Message);
+                    if (attempt == 1) await Task.Delay(TimeSpan.FromSeconds(5));
+                }
+            }
+            return null;
+        }
+
+        // Reads the picture from the current latest.json so it can be shown again during a NASA outage.
+        private async Task<ApodInfo?> LoadPreviousApodAsync(BlobContainerClient containerClient)
+        {
+            try
+            {
+                var blob = containerClient.GetBlobClient("latest.json");
+                if (!await blob.ExistsAsync())
+                    return null;
+
+                var previous = JsonSerializer.Deserialize<DigestModel>((await blob.DownloadContentAsync()).Value.Content.ToString());
+                var apod = previous?.apod;
+                if (apod == null || string.IsNullOrEmpty(apod.title))
+                    return null;
+
+                // Older digests didn't store the picture's own date; use the digest's date.
+                if (string.IsNullOrEmpty(apod.date))
+                    apod.date = previous!.date;
+                return apod;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Couldn't read previous digest: {msg}", ex.Message);
+                return null;
             }
         }
 
@@ -243,7 +291,7 @@ namespace TodayInSpace.Function
     public class DigestModel
     {
         public string date { get; set; } = "";
-        public ApodInfo apod { get; set; } = new();
+        public ApodInfo? apod { get; set; }
         public SpaceWeatherInfo spaceWeather { get; set; } = new();
     }
     public class ApodInfo
@@ -252,6 +300,9 @@ namespace TodayInSpace.Function
         public string explanation { get; set; } = "";
         public string imageUrl { get; set; } = "";
         public string copyright { get; set; } = "";
+        // The date NASA published this picture. Differs from the digest date when
+        // NASA was unavailable and the previous picture was carried over.
+        public string date { get; set; } = "";
         // Name of our archived copy in the images container (null if not archived).
         public string? imageBlob { get; set; }
         // NASA's original image URL, kept for reference/credit.

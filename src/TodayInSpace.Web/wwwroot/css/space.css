@@ -145,6 +145,15 @@ a { color: var(--accent); }
     margin: 28px 0 10px;
 }
 .apod p.explain { color: var(--ink-soft); font-size: 16px; max-width: 70ch; }
+.apod-note {
+    margin: 16px 0 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--watch);
+    background: color-mix(in srgb, var(--watch) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--watch) 35%, transparent);
+}
 .apod .credit { margin-top: 10px; font-size: 13px; color: var(--ink-faint); font-style: italic; }
 
 /* ---- Space weather cards ---- */
