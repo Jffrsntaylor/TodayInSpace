@@ -56,16 +56,26 @@ namespace TodayInSpace.Function
 
                 apod = new ApodInfo
                 {
-                    title       = GetString(root, "title"),
-                    explanation = GetString(root, "explanation"),
-                    imageUrl    = imageUrl,
-                    copyright   = GetString(root, "copyright")
+                    title          = GetString(root, "title"),
+                    explanation    = GetString(root, "explanation"),
+                    imageUrl       = imageUrl,
+                    sourceImageUrl = imageUrl,
+                    copyright      = GetString(root, "copyright")
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogError("APOD fetch failed: {msg}. Aborting (no headline image).", ex.Message);
                 return;  // APOD is the headline; if it fails, skip today's digest
+            }
+
+            // ---- 1b. Keep our own copy of the image ----
+            // NASA's image URLs have changed before; the archive shouldn't depend on them.
+            // If this fails the digest still publishes with NASA's link.
+            if (!string.IsNullOrEmpty(apod.imageUrl))
+            {
+                var images = ImageArchiver.GetContainer(connStr);
+                apod.imageBlob = await ImageArchiver.ArchiveAsync(images, today, apod.imageUrl, _logger);
             }
 
             // ---- 2. NOAA current Kp ----
@@ -248,6 +258,10 @@ namespace TodayInSpace.Function
         public string explanation { get; set; } = "";
         public string imageUrl { get; set; } = "";
         public string copyright { get; set; } = "";
+        // Name of our archived copy in the images container (null if not archived).
+        public string? imageBlob { get; set; }
+        // NASA's original image URL, kept for reference/credit.
+        public string sourceImageUrl { get; set; } = "";
     }
     public class SpaceWeatherInfo
     {

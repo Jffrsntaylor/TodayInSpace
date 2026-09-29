@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Azure.Storage.Blobs;
+using TodayInSpace.Core;
 using TodayInSpace.Web.Models;
 
 namespace TodayInSpace.Web.Services
@@ -8,11 +9,32 @@ namespace TodayInSpace.Web.Services
     {
         private readonly string? _connStr;
         private readonly string? _container;
+        private readonly string _imagesContainer;
 
         public DigestService(IConfiguration config)
         {
             _connStr = config["Storage:ConnectionString"];
             _container = config["Storage:ContainerName"];
+            _imagesContainer = config["Storage:ImagesContainerName"] ?? "images";
+        }
+
+        // Opens an archived APOD image for streaming. Returns null if the name isn't one
+        // we generate, storage isn't configured, or the image doesn't exist.
+        public async Task<(Stream Content, string ContentType)?> OpenImageAsync(string name)
+        {
+            if (!ApodImageNaming.IsValidBlobName(name) || string.IsNullOrEmpty(_connStr))
+                return null;
+
+            try
+            {
+                var blob = new BlobContainerClient(_connStr, _imagesContainer).GetBlobClient(name);
+                var result = await blob.DownloadStreamingAsync();
+                return (result.Value.Content, ApodImageNaming.GetContentType(name));
+            }
+            catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+            {
+                return null;
+            }
         }
 
         // Reads the most recent digest (the timer function keeps "latest.json" updated).
