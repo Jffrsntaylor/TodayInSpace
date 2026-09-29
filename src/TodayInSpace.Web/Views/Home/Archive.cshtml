@@ -98,6 +98,10 @@
                             }
                         </div>
                     </div>
+                    @if (ApodImageHelper.GetCarriedOverDate(Model) is DateTime carriedFrom)
+                    {
+                        <p class="apod-note">NASA&rsquo;s picture service was down during that day&rsquo;s update, so this is the picture from @(carriedFrom.ToString("MMMM d")).</p>
+                    }
                     <h2>@Model.Apod.Title</h2>
                     <p class="explain">@Model.Apod.Explanation</p>
                     @if (!string.IsNullOrEmpty(Model.Apod.Copyright))

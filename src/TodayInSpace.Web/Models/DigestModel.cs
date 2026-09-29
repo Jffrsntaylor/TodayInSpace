@@ -38,6 +38,11 @@ namespace TodayInSpace.Web.Models
         // NASA's original image URL.
         [JsonPropertyName("sourceImageUrl")]
         public string? SourceImageUrl { get; set; }
+
+        // The date NASA published this picture. Older digests don't have it.
+        // If it differs from the digest's date, NASA was down and the last good picture was reused.
+        [JsonPropertyName("date")]
+        public string? Date { get; set; }
     }
 
     // Space weather section

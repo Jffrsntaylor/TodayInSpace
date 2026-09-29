@@ -18,5 +18,17 @@ namespace TodayInSpace.Web.Helpers
 
             return string.IsNullOrWhiteSpace(apod.ImageUrl) ? null : apod.ImageUrl;
         }
+
+        // When NASA's API was down during the daily update, the digest reuses the last good picture.
+        // Returns that picture's original date so the page can say so; null when the picture is current.
+        public static DateTime? GetCarriedOverDate(DigestModel? digest)
+        {
+            string? apodDate = digest?.Apod?.Date;
+            if (string.IsNullOrWhiteSpace(apodDate) || string.IsNullOrWhiteSpace(digest!.Date) || apodDate == digest.Date)
+                return null;
+
+            return DateTime.TryParseExact(apodDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+        }
     }
 }
