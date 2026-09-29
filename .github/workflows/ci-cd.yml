@@ -47,11 +47,11 @@ jobs:
           name: function
           path: out/function
 
-  # Deploys only on pushes to main, and only once the Azure secrets/variables are set
+  # Deploys on pushes to main (or a manual "Run workflow"), and only once the Azure secrets/variables are set
   # (see README > Deploying). Until then this job is skipped instead of failing.
   deploy:
     needs: build-test
-    if: github.event_name == 'push' && vars.AZURE_WEBAPP_NAME != ''
+    if: github.event_name != 'pull_request' && vars.AZURE_WEBAPP_NAME != ''
     runs-on: ubuntu-latest
     environment: production
     steps:
