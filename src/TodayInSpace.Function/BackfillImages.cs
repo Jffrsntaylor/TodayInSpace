@@ -47,7 +47,7 @@ namespace TodayInSpace.Function
 
             // Newest first, so latest.json-era days are covered first.
             var names = new List<string>();
-            await foreach (var item in digests.GetBlobsAsync(traits: BlobTraits.None))
+            await foreach (var item in digests.GetBlobsAsync(BlobTraits.None, BlobStates.None, null, default))
                 if (DatedDigest.IsMatch(item.Name))
                     names.Add(item.Name);
             names.Sort(StringComparer.Ordinal);
