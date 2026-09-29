@@ -42,103 +42,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg:#f4f2ec; --surface:#ffffff; --ink:#1a1d29; --ink-soft:#565b6e;
-            --ink-faint:#8a8fa0; --line:#e4e1d8; --space:#060b1e; --accent:#6f7bf7;
-            --calm-bg:#e3f6ee; --calm-bd:#52c08a; --calm-tx:#0d6b48;
-            --watch-bg:#fbeed8; --watch-bd:#e69a1f; --watch-tx:#8a5208;
-            --info-bg:#e6effb; --info-bd:#3b86d8; --info-tx:#0c437e;
-            --alert-bg:#fce9e7; --alert-bd:#e0503f; --alert-tx:#9c2c1f;
-        }
-        * { box-sizing:border-box; margin:0; padding:0; }
-        body {
-            background:var(--bg); color:var(--ink);
-            font-family:'Manrope',system-ui,sans-serif; line-height:1.6;
-            -webkit-font-smoothing:antialiased; min-height:100vh;
-            background-image:
-                radial-gradient(circle at 12% 18%, rgba(111,123,247,0.06), transparent 40%),
-                radial-gradient(circle at 88% 8%, rgba(224,80,63,0.05), transparent 35%);
-        }
-        .wrap { max-width:920px; margin:0 auto; padding:48px 24px 64px; }
-
-        .topnav { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-        .topnav a { color:var(--accent); text-decoration:none; font-weight:600; font-size:14px; }
-        .topnav a:hover { text-decoration:underline; }
-
-        .masthead { text-align:center; padding-bottom:24px; border-bottom:1px solid var(--line); }
-        .eyebrow { font-size:12px; letter-spacing:0.32em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:10px; }
-        .masthead h1 {
-            font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(34px,6vw,54px);
-            letter-spacing:-0.02em; line-height:1;
-            background:linear-gradient(135deg,#1a1d29 30%,#6f7bf7);
-            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
-        }
-
-        /* Date picker bar */
-        .picker {
-            display:flex; gap:12px; align-items:center; justify-content:center;
-            flex-wrap:wrap; margin:28px 0;
-            background:var(--surface); border:1px solid var(--line);
-            border-radius:14px; padding:20px;
-        }
-        .picker label { font-family:'Sora',sans-serif; font-weight:600; font-size:14px; color:var(--ink-soft); }
-        .picker input[type=date] {
-            font-family:'Manrope',sans-serif; font-size:15px;
-            padding:10px 14px; border:1px solid var(--line); border-radius:8px;
-            background:#fff; color:var(--ink);
-        }
-        .picker button {
-            font-family:'Sora',sans-serif; font-weight:600; font-size:14px;
-            padding:10px 22px; border:none; border-radius:8px;
-            background:var(--accent); color:#fff; cursor:pointer;
-        }
-        .picker button:hover { background:#5a66e0; }
-
-        .section-label {
-            font-family:'Sora',sans-serif; font-size:13px; font-weight:700;
-            letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-soft);
-            margin:36px 0 16px; display:flex; align-items:center; gap:12px;
-        }
-        .section-label::after { content:""; flex:1; height:1px; background:var(--line); }
-
-        .apod-frame {
-            position:relative; border-radius:18px; overflow:hidden;
-            background:radial-gradient(circle at 30% 40%,#1d2a52,transparent 60%),
-                       radial-gradient(circle at 75% 65%,#3a1d47,transparent 55%), var(--space);
-            aspect-ratio:16/9; box-shadow:0 18px 50px -20px rgba(6,11,30,0.5);
-            display:flex; align-items:center; justify-content:center;
-        }
-        .apod-frame img { width:100%; height:100%; object-fit:cover; display:block; }
-        .apod h2 { font-family:'Sora',sans-serif; font-weight:700; font-size:22px; margin:20px 0 10px; }
-        .apod p.explain { color:var(--ink-soft); font-size:16px; max-width:68ch; }
-        .apod .credit { margin-top:10px; font-size:13px; color:var(--ink-faint); font-style:italic; }
-
-        .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-        .card { border-radius:16px; padding:24px 20px; border:1px solid; text-align:center; }
-        .card .label { font-family:'Sora',sans-serif; font-size:13px; font-weight:600; margin-bottom:10px; }
-        .card .value { font-family:'Sora',sans-serif; font-weight:800; font-size:46px; line-height:1; }
-        .card .value.text { font-size:24px; }
-        .card .sub { margin-top:8px; font-size:13px; font-style:italic; }
-        .card.calm { background:var(--calm-bg); border-color:var(--calm-bd); color:var(--calm-tx); }
-        .card.watch { background:var(--watch-bg); border-color:var(--watch-bd); color:var(--watch-tx); }
-        .card.info { background:var(--info-bg); border-color:var(--info-bd); color:var(--info-tx); }
-        .card.alert { background:var(--alert-bg); border-color:var(--alert-bd); color:var(--alert-tx); }
-
-        .notice {
-            text-align:center; padding:50px 24px; color:var(--ink-faint);
-            background:var(--surface); border:1px dashed var(--line); border-radius:14px;
-        }
-        .notice strong { color:var(--ink-soft); font-family:'Sora',sans-serif; }
-
-        .digest-date { text-align:center; color:var(--ink-faint); font-size:15px; margin-top:8px; }
-
-        .foot { margin-top:48px; padding-top:20px; border-top:1px solid var(--line); text-align:center; color:var(--ink-faint); font-size:13px; }
-
-        @@media (max-width:620px) { .cards { grid-template-columns:1fr; } .wrap { padding:32px 18px; } }
-    </style>
+    <link rel="stylesheet" href="~/css/space.css" asp-append-version="true" />
 </head>
 <body>
+    <canvas id="starfield" aria-hidden="true"></canvas>
     <div class="wrap">
 
         <div class="topnav">
@@ -178,11 +85,18 @@
             {
                 <section class="apod">
                     <div class="section-label">Astronomy Picture of the Day</div>
-                    <div class="apod-frame">
-                        @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
+                    @{ var displaySrc = ApodImageHelper.GetDisplayUrl(Model.Apod); }
+                    <div class="apod-stage">
+                        @if (displaySrc != null)
                         {
-                            <img src="@imageSrc" alt="@Model.Apod.Title" />
+                            <img class="apod-ambient" src="@displaySrc" alt="" aria-hidden="true" />
                         }
+                        <div class="apod-frame">
+                            @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
+                            {
+                                <img src="@imageSrc" alt="@Model.Apod.Title" />
+                            }
+                        </div>
                     </div>
                     <h2>@Model.Apod.Title</h2>
                     <p class="explain">@Model.Apod.Explanation</p>
@@ -223,5 +137,6 @@
         </footer>
 
     </div>
+    <script src="~/js/starfield.js" asp-append-version="true"></script>
 </body>
 </html>

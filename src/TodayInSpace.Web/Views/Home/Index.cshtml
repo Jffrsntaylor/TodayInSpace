@@ -37,253 +37,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg:           #f4f2ec;
-            --surface:      #ffffff;
-            --ink:          #1a1d29;
-            --ink-soft:     #565b6e;
-            --ink-faint:    #8a8fa0;
-            --line:         #e4e1d8;
-            --space:        #060b1e;
-
-            --calm-bg:#e3f6ee; --calm-bd:#52c08a; --calm-tx:#0d6b48;
-            --watch-bg:#fbeed8; --watch-bd:#e69a1f; --watch-tx:#8a5208;
-            --info-bg:#e6effb; --info-bd:#3b86d8; --info-tx:#0c437e;
-            --alert-bg:#fce9e7; --alert-bd:#e0503f; --alert-tx:#9c2c1f;
-
-            --accent:#6f7bf7;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            background: var(--bg);
-            color: var(--ink);
-            font-family: 'Manrope', system-ui, sans-serif;
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-            background-image:
-                radial-gradient(circle at 12% 18%, rgba(111,123,247,0.06), transparent 40%),
-                radial-gradient(circle at 88% 8%, rgba(224,80,63,0.05), transparent 35%);
-            min-height: 100vh;
-        }
-
-        .wrap {
-            max-width: 920px;
-            margin: 0 auto;
-            padding: 56px 24px 64px;
-        }
-
-        /* ---- Header ---- */
-        .masthead {
-            text-align: center;
-            padding-bottom: 28px;
-            border-bottom: 1px solid var(--line);
-            animation: rise .6s ease both;
-        }
-        .eyebrow {
-            font-size: 12px;
-            letter-spacing: 0.32em;
-            text-transform: uppercase;
-            color: var(--accent);
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        .masthead h1 {
-            font-family: 'Sora', sans-serif;
-            font-weight: 800;
-            font-size: clamp(40px, 7vw, 68px);
-            letter-spacing: -0.02em;
-            line-height: 1;
-            background: linear-gradient(135deg, #1a1d29 30%, #6f7bf7);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .masthead .date {
-            margin-top: 12px;
-            color: var(--ink-faint);
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        /* ---- Section labels ---- */
-        .section-label {
-            font-family: 'Sora', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--ink-soft);
-            margin: 44px 0 18px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .section-label::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: var(--line);
-        }
-
-        /* ---- APOD ---- */
-        .apod { animation: rise .6s ease .1s both; }
-        .apod-frame {
-            position: relative;
-            border-radius: 18px;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at 30% 40%, #1d2a52, transparent 60%),
-                radial-gradient(circle at 75% 65%, #3a1d47, transparent 55%),
-                var(--space);
-            aspect-ratio: 16 / 9;
-            box-shadow: 0 18px 50px -20px rgba(6,11,30,0.5);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .apod-frame img {
-            width: 100%; height: 100%;
-            object-fit: cover; display: block;
-        }
-        .apod-frame .placeholder {
-            color: #8fa3d4;
-            font-size: 14px;
-            letter-spacing: 0.04em;
-        }
-        .apod h2 {
-            font-family: 'Sora', sans-serif;
-            font-weight: 700;
-            font-size: 24px;
-            letter-spacing: -0.01em;
-            margin: 22px 0 10px;
-        }
-        .apod p.explain {
-            color: var(--ink-soft);
-            font-size: 16px;
-            max-width: 68ch;
-        }
-        .apod .credit {
-            margin-top: 10px;
-            font-size: 13px;
-            color: var(--ink-faint);
-            font-style: italic;
-        }
-
-        /* ---- Weather cards ---- */
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            animation: rise .6s ease .2s both;
-        }
-        .card {
-            border-radius: 16px;
-            padding: 24px 20px;
-            border: 1px solid;
-            text-align: center;
-            transition: transform .2s ease, box-shadow .2s ease;
-        }
-        .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -16px rgba(0,0,0,0.3); }
-        .card .label {
-            font-family: 'Sora', sans-serif;
-            font-size: 13px; font-weight: 600;
-            letter-spacing: 0.04em;
-            margin-bottom: 10px;
-        }
-        .card .value {
-            font-family: 'Sora', sans-serif;
-            font-weight: 800;
-            font-size: 46px;
-            line-height: 1;
-        }
-        .card .value.text { font-size: 26px; }
-        .card .sub {
-            margin-top: 8px;
-            font-size: 13px; font-style: italic;
-        }
-        .card.calm  { background: var(--calm-bg);  border-color: var(--calm-bd);  color: var(--calm-tx); }
-        .card.watch { background: var(--watch-bg); border-color: var(--watch-bd); color: var(--watch-tx); }
-        .card.info  { background: var(--info-bg);  border-color: var(--info-bd);  color: var(--info-tx); }
-        .card.alert { background: var(--alert-bg); border-color: var(--alert-bd); color: var(--alert-tx); }
-
-        /* ---- Forecast ---- */
-        .forecast { margin-top: 30px; animation: rise .6s ease .3s both; }
-        .forecast .bars {
-            display: flex;
-            justify-content: space-around;
-            align-items: flex-end;
-            gap: 28px;
-            height: 130px;
-            padding: 0 12px;
-        }
-        .bar {
-            flex: 1; max-width: 80px;
-            display: flex; flex-direction: column;
-            align-items: center; gap: 8px; height: 100%;
-        }
-        .bar .num {
-            font-family: 'Sora', sans-serif;
-            font-weight: 700; font-size: 14px;
-            color: var(--ink);
-        }
-        .bar .track {
-            flex: 1; width: 100%;
-            display: flex; align-items: flex-end;
-        }
-        .bar .fill {
-            width: 100%;
-            background: linear-gradient(180deg, #8b95f9, #6f7bf7);
-            border-radius: 6px 6px 0 0;
-            min-height: 6px;
-            box-shadow: 0 4px 14px -4px rgba(111,123,247,0.6);
-        }
-        .bar .day {
-            font-size: 13px; color: var(--ink-soft); font-weight: 500;
-        }
-
-        /* ---- Empty state ---- */
-        .empty {
-            text-align: center;
-            padding: 60px 24px;
-            color: var(--ink-faint);
-        }
-
-        /* ---- Footer ---- */
-        .foot {
-            margin-top: 52px;
-            padding-top: 20px;
-            border-top: 1px solid var(--line);
-            text-align: center;
-            color: var(--ink-faint);
-            font-size: 13px;
-        }
-        .foot .region {
-            margin-top: 6px;
-            font-size: 12px;
-            letter-spacing: 0.04em;
-        }
-        .foot .archive-link {
-            font-family: 'Sora', sans-serif;
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--accent);
-            text-decoration: none;
-        }
-        .foot .archive-link:hover { text-decoration: underline; }
-
-        @@keyframes rise {
-            from { opacity: 0; transform: translateY(14px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        @@media (max-width: 620px) {
-            .cards { grid-template-columns: 1fr; }
-            .wrap { padding: 36px 18px 48px; }
-        }
-    </style>
+    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="~/css/space.css" asp-append-version="true" />
 </head>
 <body>
+    <canvas id="starfield" aria-hidden="true"></canvas>
     <div class="wrap">
 
         <header class="masthead">
@@ -304,15 +62,22 @@
             {
                 <section class="apod">
                     <div class="section-label">Astronomy Picture of the Day</div>
-                    <div class="apod-frame">
-                        @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
+                    @{ var displaySrc = ApodImageHelper.GetDisplayUrl(Model.Apod); }
+                    <div class="apod-stage">
+                        @if (displaySrc != null)
                         {
-                            <img src="@imageSrc" alt="@Model.Apod.Title" />
+                            <img class="apod-ambient" src="@displaySrc" alt="" aria-hidden="true" />
                         }
-                        else
-                        {
-                            <span class="placeholder">Image unavailable</span>
-                        }
+                        <div class="apod-frame">
+                            @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
+                            {
+                                <img src="@imageSrc" alt="@Model.Apod.Title" />
+                            }
+                            else
+                            {
+                                <span class="placeholder">Image unavailable</span>
+                            }
+                        </div>
                     </div>
                     <h2>@Model.Apod.Title</h2>
                     <p class="explain">@Model.Apod.Explanation</p>
@@ -367,11 +132,39 @@
             }
         }
 
+        <section class="sky">
+            <div class="section-label">Live Sky</div>
+            <div class="sky-panel">
+                <div id="sky-map" class="sky-map" aria-label="World map showing the International Space Station's current position and orbit, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
+                <div class="sky-readout">
+                    <div class="stat"><span class="k">ISS latitude</span><span class="v" id="iss-lat">&mdash;</span></div>
+                    <div class="stat"><span class="k">ISS longitude</span><span class="v" id="iss-lon">&mdash;</span></div>
+                    <div class="stat"><span class="k">Altitude</span><span class="v" id="iss-alt">&mdash;</span></div>
+                    <div class="stat"><span class="k">Speed</span><span class="v" id="iss-speed">&mdash;</span></div>
+                    <button type="button" id="iss-follow" class="chip" aria-pressed="false">Follow ISS</button>
+                </div>
+                <div class="sky-legend">
+                    <span><span class="line"></span>ISS orbit (next ~90 min)</span>
+                    <span><span class="sw" style="background:#35d49a"></span>Aurora 5&ndash;15%</span>
+                    <span><span class="sw" style="background:#7dffb3"></span>15&ndash;30%</span>
+                    <span><span class="sw" style="background:#ffd166"></span>30&ndash;50%</span>
+                    <span><span class="sw" style="background:#ff5d8f"></span>50%+</span>
+                    <span><span class="sw" style="background:#00030d;border:1px solid rgba(255,255,255,.25)"></span>Night side</span>
+                    <span class="status" id="sky-status" role="status"></span>
+                </div>
+            </div>
+            <p class="sky-note">ISS position is calculated live in your browser from its latest orbital elements (CelesTrak). Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>.</p>
+        </section>
+
         <footer class="foot">
             <div><a href="/Home/Archive" class="archive-link">View past forecasts &rarr;</a></div>
             <div style="margin-top:8px;">Updated daily &middot; Data: NASA APOD, NOAA SWPC</div>
         </footer>
 
     </div>
+    <script src="~/lib/leaflet/leaflet.js"></script>
+    <script src="~/lib/satellite.js/satellite.min.js"></script>
+    <script src="~/js/sky-map.js" asp-append-version="true"></script>
+    <script src="~/js/starfield.js" asp-append-version="true"></script>
 </body>
 </html>
