@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TodayInSpace.Web/TodayInSpace.Web.csproj" />
+    <Project Path="src/TodayInSpace.Function/TodayInSpace.Function.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TodayInSpace.Web.Tests/TodayInSpace.Web.Tests.csproj" />
+  </Folder>
+</Solution>

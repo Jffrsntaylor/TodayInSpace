@@ -1,0 +1,377 @@
+@model TodayInSpace.Web.Models.DigestModel
+@{
+    ViewData["Title"] = "Today in Space";
+    Layout = null;
+
+    var sw = Model?.SpaceWeather;
+    int kp = sw?.CurrentKp ?? -1;
+
+    // Color-coding comes from SpaceWeatherHelper so the unit tests cover what's rendered.
+    string kpClass = SpaceWeatherHelper.GetKpSeverity(sw?.CurrentKp);
+    string kpDesc = kp >= 0 ? SpaceWeatherHelper.GetKpDescription(kp) : "";
+
+    string aurora = (sw?.AuroraChance ?? "").ToUpper();
+    string auroraClass = SpaceWeatherHelper.GetAuroraSeverity(aurora);
+    string auroraSub = aurora switch
+    {
+        "POSSIBLE" => "high latitudes only",
+        "LIKELY" => "mid to high latitudes",
+        "STRONG" => "visible far south",
+        "UNLIKELY" => "no activity expected",
+        _ => ""
+    };
+
+    // Pretty date
+    string prettyDate = "";
+    if (!string.IsNullOrEmpty(Model?.Date) && DateTime.TryParse(Model.Date, out var d))
+    {
+        prettyDate = d.ToString("dddd, MMMM d, yyyy");
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Today in Space</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:           #f4f2ec;
+            --surface:      #ffffff;
+            --ink:          #1a1d29;
+            --ink-soft:     #565b6e;
+            --ink-faint:    #8a8fa0;
+            --line:         #e4e1d8;
+            --space:        #060b1e;
+
+            --calm-bg:#e3f6ee; --calm-bd:#52c08a; --calm-tx:#0d6b48;
+            --watch-bg:#fbeed8; --watch-bd:#e69a1f; --watch-tx:#8a5208;
+            --info-bg:#e6effb; --info-bd:#3b86d8; --info-tx:#0c437e;
+            --alert-bg:#fce9e7; --alert-bd:#e0503f; --alert-tx:#9c2c1f;
+
+            --accent:#6f7bf7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Manrope', system-ui, sans-serif;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            background-image:
+                radial-gradient(circle at 12% 18%, rgba(111,123,247,0.06), transparent 40%),
+                radial-gradient(circle at 88% 8%, rgba(224,80,63,0.05), transparent 35%);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 56px 24px 64px;
+        }
+
+        /* ---- Header ---- */
+        .masthead {
+            text-align: center;
+            padding-bottom: 28px;
+            border-bottom: 1px solid var(--line);
+            animation: rise .6s ease both;
+        }
+        .eyebrow {
+            font-size: 12px;
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .masthead h1 {
+            font-family: 'Sora', sans-serif;
+            font-weight: 800;
+            font-size: clamp(40px, 7vw, 68px);
+            letter-spacing: -0.02em;
+            line-height: 1;
+            background: linear-gradient(135deg, #1a1d29 30%, #6f7bf7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .masthead .date {
+            margin-top: 12px;
+            color: var(--ink-faint);
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        /* ---- Section labels ---- */
+        .section-label {
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--ink-soft);
+            margin: 44px 0 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .section-label::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--line);
+        }
+
+        /* ---- APOD ---- */
+        .apod { animation: rise .6s ease .1s both; }
+        .apod-frame {
+            position: relative;
+            border-radius: 18px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 30% 40%, #1d2a52, transparent 60%),
+                radial-gradient(circle at 75% 65%, #3a1d47, transparent 55%),
+                var(--space);
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 18px 50px -20px rgba(6,11,30,0.5);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .apod-frame img {
+            width: 100%; height: 100%;
+            object-fit: cover; display: block;
+        }
+        .apod-frame .placeholder {
+            color: #8fa3d4;
+            font-size: 14px;
+            letter-spacing: 0.04em;
+        }
+        .apod h2 {
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 24px;
+            letter-spacing: -0.01em;
+            margin: 22px 0 10px;
+        }
+        .apod p.explain {
+            color: var(--ink-soft);
+            font-size: 16px;
+            max-width: 68ch;
+        }
+        .apod .credit {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--ink-faint);
+            font-style: italic;
+        }
+
+        /* ---- Weather cards ---- */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            animation: rise .6s ease .2s both;
+        }
+        .card {
+            border-radius: 16px;
+            padding: 24px 20px;
+            border: 1px solid;
+            text-align: center;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -16px rgba(0,0,0,0.3); }
+        .card .label {
+            font-family: 'Sora', sans-serif;
+            font-size: 13px; font-weight: 600;
+            letter-spacing: 0.04em;
+            margin-bottom: 10px;
+        }
+        .card .value {
+            font-family: 'Sora', sans-serif;
+            font-weight: 800;
+            font-size: 46px;
+            line-height: 1;
+        }
+        .card .value.text { font-size: 26px; }
+        .card .sub {
+            margin-top: 8px;
+            font-size: 13px; font-style: italic;
+        }
+        .card.calm  { background: var(--calm-bg);  border-color: var(--calm-bd);  color: var(--calm-tx); }
+        .card.watch { background: var(--watch-bg); border-color: var(--watch-bd); color: var(--watch-tx); }
+        .card.info  { background: var(--info-bg);  border-color: var(--info-bd);  color: var(--info-tx); }
+        .card.alert { background: var(--alert-bg); border-color: var(--alert-bd); color: var(--alert-tx); }
+
+        /* ---- Forecast ---- */
+        .forecast { margin-top: 30px; animation: rise .6s ease .3s both; }
+        .forecast .bars {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            gap: 28px;
+            height: 130px;
+            padding: 0 12px;
+        }
+        .bar {
+            flex: 1; max-width: 80px;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 8px; height: 100%;
+        }
+        .bar .num {
+            font-family: 'Sora', sans-serif;
+            font-weight: 700; font-size: 14px;
+            color: var(--ink);
+        }
+        .bar .track {
+            flex: 1; width: 100%;
+            display: flex; align-items: flex-end;
+        }
+        .bar .fill {
+            width: 100%;
+            background: linear-gradient(180deg, #8b95f9, #6f7bf7);
+            border-radius: 6px 6px 0 0;
+            min-height: 6px;
+            box-shadow: 0 4px 14px -4px rgba(111,123,247,0.6);
+        }
+        .bar .day {
+            font-size: 13px; color: var(--ink-soft); font-weight: 500;
+        }
+
+        /* ---- Empty state ---- */
+        .empty {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--ink-faint);
+        }
+
+        /* ---- Footer ---- */
+        .foot {
+            margin-top: 52px;
+            padding-top: 20px;
+            border-top: 1px solid var(--line);
+            text-align: center;
+            color: var(--ink-faint);
+            font-size: 13px;
+        }
+        .foot .region {
+            margin-top: 6px;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+        }
+        .foot .archive-link {
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .foot .archive-link:hover { text-decoration: underline; }
+
+        @@keyframes rise {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @@media (max-width: 620px) {
+            .cards { grid-template-columns: 1fr; }
+            .wrap { padding: 36px 18px 48px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+
+        <header class="masthead">
+            <div class="eyebrow">Daily Digest</div>
+            <h1>Today in Space</h1>
+            <div class="date">@(string.IsNullOrEmpty(prettyDate) ? "Astronomy &amp; space-weather" : prettyDate)</div>
+        </header>
+
+        @if (Model?.Apod == null && sw == null)
+        {
+            <div class="empty">
+                <p>No digest available right now. Check back after the next update.</p>
+            </div>
+        }
+        else
+        {
+            @if (Model?.Apod != null)
+            {
+                <section class="apod">
+                    <div class="section-label">Astronomy Picture of the Day</div>
+                    <div class="apod-frame">
+                        @if (!string.IsNullOrEmpty(Model.Apod.ImageUrl))
+                        {
+                            <img src="@Model.Apod.ImageUrl" alt="@Model.Apod.Title" />
+                        }
+                        else
+                        {
+                            <span class="placeholder">Image unavailable</span>
+                        }
+                    </div>
+                    <h2>@Model.Apod.Title</h2>
+                    <p class="explain">@Model.Apod.Explanation</p>
+                    @if (!string.IsNullOrEmpty(Model.Apod.Copyright))
+                    {
+                        <p class="credit">Credit &amp; Copyright: @Model.Apod.Copyright</p>
+                    }
+                </section>
+            }
+
+            @if (sw != null)
+            {
+                <section>
+                    <div class="section-label">Space Weather</div>
+                    <div class="cards">
+                        <div class="card @kpClass">
+                            <div class="label">Kp Index</div>
+                            <div class="value">@(kp >= 0 ? kp.ToString() : "—")</div>
+                            <div class="sub">@kpDesc</div>
+                        </div>
+                        <div class="card @auroraClass">
+                            <div class="label">Aurora Chance</div>
+                            <div class="value text">@(string.IsNullOrEmpty(aurora) ? "—" : aurora)</div>
+                            <div class="sub">@auroraSub</div>
+                        </div>
+                        <div class="card info">
+                            <div class="label">Solar Wind</div>
+                            <div class="value">@(sw.SolarWindSpeed?.ToString() ?? "—")</div>
+                            <div class="sub">km/s</div>
+                        </div>
+                    </div>
+
+                    @if (sw.Forecast != null && sw.Forecast.Count > 0)
+                    {
+                        <div class="forecast">
+                            <div class="section-label">3-Day Kp Forecast</div>
+                            <div class="bars">
+                                @foreach (var day in sw.Forecast)
+                                {
+                                    int dk = day.Kp ?? 0;
+                                    int pct = SpaceWeatherHelper.GetForecastBarPercent(day.Kp);
+                                    <div class="bar">
+                                        <div class="num">@dk</div>
+                                        <div class="track"><div class="fill" style="height:@(pct)%"></div></div>
+                                        <div class="day">@day.Day</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </section>
+            }
+        }
+
+        <footer class="foot">
+            <div><a href="/Home/Archive" class="archive-link">View past forecasts &rarr;</a></div>
+            <div style="margin-top:8px;">Updated daily &middot; Data: NASA APOD, NOAA SWPC</div>
+        </footer>
+
+    </div>
+</body>
+</html>
