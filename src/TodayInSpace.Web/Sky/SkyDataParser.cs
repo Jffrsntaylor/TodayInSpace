@@ -2,8 +2,8 @@ using System.Text.Json;
 
 namespace TodayInSpace.Web.Sky
 {
-    // Two-line element set for the ISS, propagated in the browser with satellite.js.
-    public record IssTle(string Name, string Line1, string Line2);
+    // Two-line element set for a satellite, propagated in the browser with satellite.js.
+    public record SatelliteTle(string Name, string Line1, string Line2);
 
     // Aurora probability points from NOAA's OVATION model: [longitude (-180..180), latitude, probability %].
     public record AuroraSnapshot(string? ObservationTime, string? ForecastTime, IReadOnlyList<int[]> Points);
@@ -12,7 +12,7 @@ namespace TodayInSpace.Web.Sky
     public static class SkyDataParser
     {
         // Parses CelesTrak's 3-line TLE format (name, line 1, line 2). Returns null if no valid pair is found.
-        public static IssTle? ParseTle(string? text)
+        public static SatelliteTle? ParseTle(string? text)
         {
             if (string.IsNullOrWhiteSpace(text))
                 return null;
@@ -26,8 +26,8 @@ namespace TodayInSpace.Web.Sky
             {
                 if (IsTleLine(lines[i], '1') && IsTleLine(lines[i + 1], '2'))
                 {
-                    string name = i > 0 ? lines[i - 1].Trim() : "ISS";
-                    return new IssTle(name, lines[i], lines[i + 1]);
+                    string name = i > 0 ? lines[i - 1].Trim() : "";
+                    return new SatelliteTle(name, lines[i], lines[i + 1]);
                 }
             }
             return null;

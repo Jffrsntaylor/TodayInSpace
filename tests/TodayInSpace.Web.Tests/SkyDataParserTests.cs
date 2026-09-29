@@ -25,7 +25,7 @@ namespace TodayInSpace.Web.Tests
         {
             var tle = SkyDataParser.ParseTle($"{Line1}\n{Line2}");
             Assert.NotNull(tle);
-            Assert.Equal("ISS", tle!.Name);
+            Assert.Equal("", tle!.Name);
         }
 
         [Theory]
@@ -42,6 +42,15 @@ namespace TodayInSpace.Web.Tests
         public void ParseTle_ReturnsNull_WhenLinesAreOutOfOrder()
         {
             Assert.Null(SkyDataParser.ParseTle($"{Line2}\n{Line1}"));
+        }
+
+        [Fact]
+        public void TrackedSatellites_AreIssAndHubble()
+        {
+            Assert.Equal(25544, SkyDataService.Satellites["iss"]);
+            Assert.Equal(20580, SkyDataService.Satellites["hubble"]);
+            Assert.True(SkyDataService.Satellites.ContainsKey("ISS"));       // case-insensitive ids
+            Assert.False(SkyDataService.Satellites.ContainsKey("25544"));    // raw catalog numbers aren't accepted
         }
 
         // ---------- OVATION aurora ----------

@@ -15,11 +15,14 @@ namespace TodayInSpace.Web.Controllers
             _sky = sky;
         }
 
-        // GET /api/sky/iss-tle
-        [HttpGet("iss-tle")]
-        public async Task<IActionResult> GetIssTle()
+        // GET /api/sky/tle/iss, /api/sky/tle/hubble
+        [HttpGet("tle/{id}")]
+        public async Task<IActionResult> GetTle(string id)
         {
-            var tle = await _sky.GetIssTleAsync();
+            if (!SkyDataService.Satellites.ContainsKey(id))
+                return NotFound();
+
+            var tle = await _sky.GetTleAsync(id);
             if (tle == null)
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
 

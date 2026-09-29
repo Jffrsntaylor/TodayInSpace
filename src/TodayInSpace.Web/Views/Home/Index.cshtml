@@ -133,27 +133,43 @@
         }
 
         <section class="sky">
-            <div class="section-label">Live Sky</div>
+            <div class="sky-head">
+                <div class="section-label">Live Sky</div>
+                <div class="view-toggle" role="tablist" aria-label="Live Sky view">
+                    <button type="button" role="tab" data-view="globe" aria-selected="true" aria-controls="sky-globe">Globe</button>
+                    <button type="button" role="tab" data-view="map" aria-selected="false" aria-controls="sky-map" tabindex="-1">Map</button>
+                </div>
+            </div>
             <div class="sky-panel">
-                <div id="sky-map" class="sky-map" aria-label="World map showing the International Space Station's current position and orbit, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
+                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" aria-label="3D globe showing the International Space Station and the Hubble Space Telescope, their orbits, and tonight's aurora forecast. Drag to rotate."></div>
+                <div id="sky-map" class="sky-map" hidden aria-label="World map showing the International Space Station and the Hubble Space Telescope, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
                 <div class="sky-readout">
-                    <div class="stat"><span class="k">ISS latitude</span><span class="v" id="iss-lat">&mdash;</span></div>
-                    <div class="stat"><span class="k">ISS longitude</span><span class="v" id="iss-lon">&mdash;</span></div>
-                    <div class="stat"><span class="k">Altitude</span><span class="v" id="iss-alt">&mdash;</span></div>
-                    <div class="stat"><span class="k">Speed</span><span class="v" id="iss-speed">&mdash;</span></div>
-                    <button type="button" id="iss-follow" class="chip" aria-pressed="false">Follow ISS</button>
+                    <div class="sat-title">
+                        <strong id="sat-name">International Space Station</strong>
+                        <div class="sat-pick" role="group" aria-label="Choose a satellite">
+                            <button type="button" class="chip" data-sat="iss" aria-pressed="true">ISS</button>
+                            <button type="button" class="chip" data-sat="hubble" aria-pressed="false">Hubble</button>
+                            <button type="button" class="chip" id="sat-follow" aria-pressed="false">Follow</button>
+                        </div>
+                    </div>
+                    <div class="stat"><span class="k">Latitude</span><span class="v" id="sat-lat">&mdash;</span></div>
+                    <div class="stat"><span class="k">Longitude</span><span class="v" id="sat-lon">&mdash;</span></div>
+                    <div class="stat"><span class="k">Altitude</span><span class="v" id="sat-alt">&mdash;</span></div>
+                    <div class="stat"><span class="k">Speed</span><span class="v" id="sat-speed">&mdash;</span></div>
                 </div>
                 <div class="sky-legend">
-                    <span><span class="line"></span>ISS orbit (next ~90 min)</span>
+                    <span><span class="line"></span>ISS orbit</span>
+                    <span><span class="line" style="border-color:#ffc46b"></span>Hubble orbit</span>
                     <span><span class="sw" style="background:#35d49a"></span>Aurora 5&ndash;15%</span>
                     <span><span class="sw" style="background:#7dffb3"></span>15&ndash;30%</span>
                     <span><span class="sw" style="background:#ffd166"></span>30&ndash;50%</span>
                     <span><span class="sw" style="background:#ff5d8f"></span>50%+</span>
-                    <span><span class="sw" style="background:#00030d;border:1px solid rgba(255,255,255,.25)"></span>Night side</span>
+                    <span data-view-only="map" hidden><span class="sw" style="background:#00030d;border:1px solid rgba(255,255,255,.25)"></span>Night side</span>
+                    <span class="sky-hint" data-view-only="globe">Drag to spin &middot; scroll or pinch to zoom &middot; click a satellite</span>
                     <span class="status" id="sky-status" role="status"></span>
                 </div>
             </div>
-            <p class="sky-note">ISS position is calculated live in your browser from its latest orbital elements (CelesTrak). Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>.</p>
+            <p class="sky-note">Positions are calculated live in your browser from each satellite&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble.</p>
         </section>
 
         <footer class="foot">
@@ -164,7 +180,10 @@
     </div>
     <script src="~/lib/leaflet/leaflet.js"></script>
     <script src="~/lib/satellite.js/satellite.min.js"></script>
+    <script src="~/lib/globe.gl/globe.gl.min.js"></script>
+    <script src="~/js/sky-core.js" asp-append-version="true"></script>
     <script src="~/js/sky-map.js" asp-append-version="true"></script>
+    <script src="~/js/sky-globe.js" asp-append-version="true"></script>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
 </body>
 </html>

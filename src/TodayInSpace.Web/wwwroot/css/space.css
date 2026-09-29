@@ -109,13 +109,13 @@ a { color: var(--accent); }
 .apod-stage { position: relative; isolation: isolate; }
 .apod-ambient {
     position: absolute;
-    inset: 4% 3%;
-    width: 94%;
-    height: 92%;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    filter: blur(56px) saturate(1.7) brightness(1.05);
-    opacity: 0.55;
-    transform: scale(1.06);
+    filter: blur(48px) saturate(1.8) brightness(1.1);
+    opacity: 0.7;
+    transform: scale(1.1);
     z-index: -1;
     pointer-events: none;
     animation: breathe 9s ease-in-out infinite alternate;
@@ -217,7 +217,7 @@ a { color: var(--accent); }
 .sky-map { height: 440px; background: #0a0f1f; }
 .sky-readout {
     display: grid;
-    grid-template-columns: repeat(4, 1fr) auto;
+    grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     align-items: center;
     padding: 16px 18px;
@@ -254,20 +254,69 @@ a { color: var(--accent); }
 .sky-legend .status { margin-left: auto; color: var(--watch); }
 .sky-note { margin-top: 10px; font-size: 13px; color: var(--ink-faint); }
 
-/* ISS marker */
-.iss-marker { position: relative; }
-.iss-marker .iss-dot {
+/* Satellite markers (map + globe) */
+.map-sat, .globe-sat { --sat-color: #b7c0ff; position: relative; }
+.map-sat--hubble, .globe-sat--hubble { --sat-color: #ffc46b; }
+.map-sat__dot, .globe-sat__dot {
     position: absolute; left: 7px; top: 7px;
     width: 10px; height: 10px; border-radius: 50%;
     background: #fff;
-    box-shadow: 0 0 10px 3px rgba(183, 192, 255, 0.95);
+    box-shadow: 0 0 10px 3px var(--sat-color);
 }
-.iss-marker .iss-pulse {
-    position: absolute; inset: 0;
+.map-sat__pulse, .globe-sat__pulse {
+    position: absolute; left: 0; top: 0; width: 24px; height: 24px;
     border-radius: 50%;
-    border: 2px solid rgba(183, 192, 255, 0.8);
+    border: 2px solid var(--sat-color);
     animation: pulse 2s ease-out infinite;
 }
+.map-sat__label, .globe-sat__label {
+    position: absolute; left: 26px; top: 3px;
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 12px;
+    color: var(--sat-color);
+    text-shadow: 0 1px 4px #000, 0 0 2px #000;
+    white-space: nowrap;
+}
+.map-sat:not(.is-selected) .map-sat__pulse,
+.globe-sat:not(.is-selected) .globe-sat__pulse { display: none; }
+
+/* Globe markers are real buttons: reset button styling and center on the point. */
+.globe-sat {
+    width: 24px; height: 24px;
+    margin: -12px 0 0 -12px;
+    padding: 0; border: 0; background: none;
+    cursor: pointer;
+    pointer-events: auto;
+}
+.globe-sat:focus-visible { outline: 2px solid var(--sat-color); outline-offset: 4px; border-radius: 50%; }
+
+/* 3D globe */
+.sky-globe {
+    height: 520px;
+    cursor: grab;
+    background: radial-gradient(circle at 50% 50%, rgba(122, 162, 255, 0.08), transparent 60%);
+}
+.sky-globe:active { cursor: grabbing; }
+.sky-globe[hidden], .sky-map[hidden] { display: none; }
+
+/* Globe / Map toggle and satellite picker */
+.sky-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 48px 0 18px; }
+.sky-head .section-label { margin: 0; flex: 1; }
+.view-toggle { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.view-toggle button {
+    font-family: 'Sora', sans-serif; font-weight: 600; font-size: 13px;
+    padding: 6px 16px; border-radius: 999px; border: 0;
+    background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.view-toggle button[aria-selected="true"] { background: var(--accent); color: #0b0e1c; }
+.view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sat-pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sat-pick .chip[data-sat="hubble"] { --accent: #ffc46b; }
+.sky-readout .sat-title {
+    grid-column: 1 / -1;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.sky-readout .sat-title strong { font-family: 'Sora', sans-serif; font-size: 15px; }
+.sky-hint { font-size: 12px; color: var(--ink-faint); }
 
 /* Leaflet, dark */
 .leaflet-container { font-family: 'Manrope', system-ui, sans-serif; background: #0a0f1f; }
@@ -335,8 +384,8 @@ a { color: var(--accent); }
     to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes breathe {
-    from { opacity: 0.42; transform: scale(1.03); }
-    to   { opacity: 0.68; transform: scale(1.09); }
+    from { opacity: 0.55; transform: scale(1.06, 1.1); }
+    to   { opacity: 0.85; transform: scale(1.12, 1.2); }
 }
 @keyframes pulse {
     from { transform: scale(0.6); opacity: 1; }
@@ -349,9 +398,9 @@ a { color: var(--accent); }
 /* ---- Small screens ---- */
 @media (max-width: 720px) {
     .wrap { padding: 36px 16px 48px; }
+    .sky-globe { height: 380px; }
     .cards { grid-template-columns: 1fr; }
     .sky-map { height: 320px; }
     .sky-readout { grid-template-columns: 1fr 1fr; }
-    .sky-readout .chip { grid-column: 1 / -1; }
     .sky-legend .status { margin-left: 0; }
 }

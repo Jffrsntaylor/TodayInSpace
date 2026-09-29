@@ -1,173 +1,17 @@
-// Live Sky map: ISS position and orbit (propagated in the browser from a TLE with satellite.js),
-// NOAA's aurora forecast, and the current day/night terminator, drawn with Leaflet.
+// Flat map view for Live Sky (Leaflet): satellites and their ground tracks, NOAA's aurora
+// forecast, and the day/night terminator. Shares data and state with the globe via TISSky.
 (function () {
     'use strict';
 
+    var sky = window.TISSky;
     var el = document.getElementById('sky-map');
-    if (!el || !window.L || !window.satellite) return;
+    if (!sky || !el || !window.L) return;
 
-    var $ = function (id) { return document.getElementById(id); };
-    var rad = function (d) { return d * Math.PI / 180; };
-    var deg = function (r) { return r * 180 / Math.PI; };
-    var wrapLon = function (lon) { return ((lon + 540) % 360) - 180; };
+    var map = null;
+    var satLayers = {};
+    var nightLayer, auroraLayer, canvas;
+    var lastAurora = null;
 
-    // ---- Map ----
-    var map = L.map(el, {
-        center: [20, 0],
-        zoom: 2,
-        minZoom: 1,
-        maxZoom: 6,
-        worldCopyJump: true,
-        scrollWheelZoom: false,   // don't hijack page scrolling; use +/- or pinch
-        zoomSnap: 0.5
-    });
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    }).addTo(map);
-
-    var canvas = L.canvas({ padding: 0.5 });
-
-    var nightLayer = L.polygon([], {
-        renderer: canvas, stroke: false, fillColor: '#00030d', fillOpacity: 0.5, interactive: false
-    }).addTo(map);
-
-    var auroraLayer = L.layerGroup().addTo(map);
-
-    var trackPast = L.polyline([], { renderer: canvas, color: '#9aa6ff', weight: 1.5, opacity: 0.45, dashArray: '3 6', interactive: false });
-    var trackNext = L.polyline([], { renderer: canvas, color: '#b7c0ff', weight: 2, opacity: 0.9, interactive: false });
-    var trackLayer = L.layerGroup([trackPast, trackNext]).addTo(map);
-
-    var issIcon = L.divIcon({
-        className: 'iss-marker',
-        html: '<span class="iss-pulse"></span><span class="iss-dot"></span>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-    });
-    var issMarker = L.marker([0, 0], { icon: issIcon, keyboard: false, title: 'International Space Station' });
-    var issLayer = L.layerGroup([issMarker]).addTo(map);
-
-    L.control.layers(null, {
-        'Space station': issLayer,
-        'Orbit path': trackLayer,
-        'Aurora forecast': auroraLayer,
-        'Night side': nightLayer
-    }, { position: 'topright' }).addTo(map);
-
-    // ---- ISS (SGP4 propagation) ----
-    var satrec = null;
-    var following = false;
-
-    function issAt(date) {
-        var pv = satellite.propagate(satrec, date);
-        if (!pv || !pv.position) return null;
-        var geo = satellite.eciToGeodetic(pv.position, satellite.gstime(date));
-        var v = pv.velocity;
-        return {
-            lat: satellite.degreesLat(geo.latitude),
-            lon: satellite.degreesLong(geo.longitude),
-            alt: geo.height,
-            speed: v ? Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) * 3600 : null // km/s -> km/h
-        };
-    }
-
-    // Ground track split wherever it crosses the antimeridian so lines don't streak across the map.
-    function groundTrack(fromMin, toMin, stepSec) {
-        var segments = [[]];
-        var prevLon = null;
-        var now = Date.now();
-        for (var t = fromMin * 60; t <= toMin * 60; t += stepSec) {
-            var p = issAt(new Date(now + t * 1000));
-            if (!p) continue;
-            if (prevLon !== null && Math.abs(p.lon - prevLon) > 180) segments.push([]);
-            segments[segments.length - 1].push([p.lat, p.lon]);
-            prevLon = p.lon;
-        }
-        return segments;
-    }
-
-    function updateTracks() {
-        if (!satrec) return;
-        trackPast.setLatLngs(groundTrack(-45, 0, 30));
-        trackNext.setLatLngs(groundTrack(0, 95, 30)); // ~one orbit ahead
-    }
-
-    var fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-
-    function updateIss() {
-        if (!satrec) return;
-        var p = issAt(new Date());
-        if (!p) return;
-        issMarker.setLatLng([p.lat, p.lon]);
-        $('iss-lat').textContent = Math.abs(p.lat).toFixed(2) + '° ' + (p.lat >= 0 ? 'N' : 'S');
-        $('iss-lon').textContent = Math.abs(p.lon).toFixed(2) + '° ' + (p.lon >= 0 ? 'E' : 'W');
-        $('iss-alt').textContent = fmt.format(p.alt) + ' km';
-        $('iss-speed').textContent = p.speed ? fmt.format(p.speed) + ' km/h' : '—';
-        if (following) map.panTo([p.lat, p.lon], { animate: true, duration: 0.8 });
-    }
-
-    var followBtn = $('iss-follow');
-    if (followBtn) {
-        followBtn.addEventListener('click', function () {
-            following = !following;
-            followBtn.setAttribute('aria-pressed', String(following));
-            followBtn.textContent = following ? 'Following ISS' : 'Follow ISS';
-            if (following) {
-                var p = satrec && issAt(new Date());
-                if (p) map.setView([p.lat, p.lon], Math.max(map.getZoom(), 3));
-            }
-        });
-    }
-    map.on('dragstart', function () {
-        if (following && followBtn) followBtn.click(); // user took over the map
-    });
-
-    function loadIss() {
-        return fetch('/api/sky/iss-tle')
-            .then(function (r) { if (!r.ok) throw new Error('TLE ' + r.status); return r.json(); })
-            .then(function (tle) {
-                satrec = satellite.twoline2satrec(tle.line1, tle.line2);
-                updateIss();
-                updateTracks();
-            });
-    }
-
-    // ---- Day / night terminator ----
-    // Low-precision solar position (accurate to a fraction of a degree), from the standard
-    // almanac approximation: mean anomaly -> ecliptic longitude -> declination / right ascension.
-    function subsolarPoint(date) {
-        var d = date.getTime() / 86400000 - 10957.5;           // days since J2000.0
-        var g = rad(357.529 + 0.98560028 * d);                   // mean anomaly
-        var q = 280.459 + 0.98564736 * d;                        // mean longitude
-        var lambda = rad(q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g));
-        var eps = rad(23.439 - 0.00000036 * d);                  // obliquity
-        var dec = Math.asin(Math.sin(eps) * Math.sin(lambda));
-        var ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));
-        var gmst = 280.46061837 + 360.98564736629 * d;           // degrees
-        return { lat: deg(dec), lon: wrapLon(deg(ra) - gmst) };
-    }
-
-    function nightPolygon(date) {
-        var sun = subsolarPoint(date);
-        var tanDec = Math.tan(rad(sun.lat));
-        if (Math.abs(tanDec) < 1e-6) tanDec = tanDec < 0 ? -1e-6 : 1e-6;
-        var pts = [];
-        for (var lon = -180; lon <= 180; lon += 2) {
-            var lat = deg(Math.atan(-Math.cos(rad(lon - sun.lon)) / tanDec));
-            pts.push([lat, lon]);
-        }
-        var darkPole = sun.lat > 0 ? -90 : 90;
-        pts.push([darkPole, 180], [darkPole, -180]);
-        return pts;
-    }
-
-    function updateNight() {
-        nightLayer.setLatLngs(nightPolygon(new Date()));
-    }
-
-    // ---- Aurora ----
     function auroraColor(p) {
         if (p >= 50) return '#ff5d8f';
         if (p >= 30) return '#ffd166';
@@ -175,49 +19,156 @@
         return '#35d49a';
     }
 
-    function loadAurora() {
-        return fetch('/api/sky/aurora')
-            .then(function (r) { if (!r.ok) throw new Error('Aurora ' + r.status); return r.json(); })
-            .then(function (data) {
-                auroraLayer.clearLayers();
-                data.points.forEach(function (pt) {
-                    var lon = pt[0], lat = pt[1], p = pt[2];
-                    L.rectangle([[lat - 0.5, lon - 0.5], [lat + 0.5, lon + 0.5]], {
-                        renderer: canvas,
-                        stroke: false,
-                        fillColor: auroraColor(p),
-                        fillOpacity: Math.min(0.12 + p / 90, 0.75),
-                        interactive: false
-                    }).addTo(auroraLayer);
-                });
-                if (data.forecastTime) {
-                    var t = new Date(data.forecastTime);
-                    $('aurora-time').textContent = isNaN(t) ? data.forecastTime :
-                        t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-                }
+    // The map is created the first time its tab is shown (Leaflet needs a visible container to size itself).
+    function init() {
+        if (map) return;
+        var narrow = el.clientWidth < 600;
+        map = L.map(el, {
+            center: [20, 0],
+            zoom: narrow ? 1 : 2,
+            minZoom: 1,
+            maxZoom: 6,
+            worldCopyJump: true,
+            scrollWheelZoom: false,   // don't hijack page scrolling; use +/- or pinch
+            zoomSnap: 0.5
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
+
+        canvas = L.canvas({ padding: 0.5 });
+        nightLayer = L.polygon([], { renderer: canvas, stroke: false, fillColor: '#00030d', fillOpacity: 0.5, interactive: false }).addTo(map);
+        auroraLayer = L.layerGroup().addTo(map);
+
+        var overlays = {};
+        sky.SATS.forEach(function (s) {
+            var past = L.polyline([], { renderer: canvas, color: s.color, weight: 1.5, opacity: 0.45, dashArray: '3 6', interactive: false });
+            var next = L.polyline([], { renderer: canvas, color: s.color, weight: 2, opacity: 0.9, interactive: false });
+            var icon = L.divIcon({
+                className: 'map-sat map-sat--' + s.id,
+                html: '<span class="map-sat__pulse"></span><span class="map-sat__dot"></span><span class="map-sat__label">' + s.name + '</span>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
             });
+            var marker = L.marker([0, 0], { icon: icon, keyboard: false, title: s.full });
+            marker.on('click', function () { sky.select(s.id); });
+            var group = L.layerGroup([past, next, marker]).addTo(map);
+            satLayers[s.id] = { past: past, next: next, marker: marker, sat: s };
+            overlays[s.name] = group;
+        });
+        overlays['Aurora forecast'] = auroraLayer;
+        overlays['Night side'] = nightLayer;
+        L.control.layers(null, overlays, { position: 'topright' }).addTo(map);
+
+        map.on('moveend', function () { if (!sky.state.following) updateTracks(); });
+        map.on('dragstart', function () { if (sky.state.following) sky.setFollowing(false); });
+
+        var p = sky.position(sky.state.selected, new Date());
+        if (p) map.setView([Math.max(-45, Math.min(45, p.lat)), p.lon], map.getZoom(), { animate: false });
+
+        updateNight();
+        updateTracks();
+        updateMarkers();
+        if (lastAurora) drawAurora(lastAurora);
     }
 
-    // ---- Status + loop ----
-    function setStatus(msg) {
-        var s = $('sky-status');
-        if (s) s.textContent = msg;
+    function updateTracks() {
+        if (!map) return;
+        var center = map.getCenter().lng;
+        sky.SATS.forEach(function (s) {
+            var layers = satLayers[s.id];
+            var now = sky.position(s.id, new Date());
+            if (!layers || !now) return;
+            var ref = sky.unwrapNear(now.lon, center);
+            var period = sky.periodMinutes(s.id);
+            var toLatLng = function (pt) { return [pt.lat, pt.lon]; };
+            layers.past.setLatLngs(sky.track(s.id, 0, -period / 2, 30, ref).map(toLatLng));
+            layers.next.setLatLngs(sky.track(s.id, 0, period, 30, ref).map(toLatLng));
+        });
     }
 
-    updateNight();
-    Promise.allSettled([loadIss(), loadAurora()]).then(function (results) {
-        var failed = [];
-        if (results[0].status === 'rejected') failed.push('space station');
-        if (results[1].status === 'rejected') failed.push('aurora forecast');
-        setStatus(failed.length ? 'Couldn’t load ' + failed.join(' and ') + ' right now.' : '');
-    });
+    function updateMarkers() {
+        if (!map) return;
+        var center = map.getCenter().lng;
+        sky.SATS.forEach(function (s) {
+            var layers = satLayers[s.id];
+            var p = sky.position(s.id, new Date());
+            if (!layers || !p) return;
+            layers.marker.setLatLng([p.lat, sky.unwrapNear(p.lon, center)]);
+            var node = layers.marker.getElement();
+            if (node) node.classList.toggle('is-selected', s.id === sky.state.selected);
+        });
+        if (sky.state.following) {
+            var sel = sky.position(sky.state.selected, new Date());
+            if (sel) map.panTo([sel.lat, sky.unwrapNear(sel.lon, center)], { animate: true, duration: 0.8 });
+        }
+    }
 
-    var tick = 0;
+    // Night-side polygon, drawn across three world widths so it still covers the map after panning past 180°.
+    function updateNight() {
+        if (!map) return;
+        var sun = sky.subsolarPoint(new Date());
+        var tanDec = Math.tan(sky.rad(sun.lat));
+        if (Math.abs(tanDec) < 1e-6) tanDec = tanDec < 0 ? -1e-6 : 1e-6;
+        var pts = [];
+        for (var lon = -540; lon <= 540; lon += 2) {
+            pts.push([sky.deg(Math.atan(-Math.cos(sky.rad(lon - sun.lon)) / tanDec)), lon]);
+        }
+        var darkPole = sun.lat > 0 ? -90 : 90;
+        pts.push([darkPole, 540], [darkPole, -540]);
+        nightLayer.setLatLngs(pts);
+    }
+
+    function drawAurora(data) {
+        lastAurora = data;
+        if (!map) return;
+        auroraLayer.clearLayers();
+        // One copy per world width (-360, 0, +360) so the ovals don't vanish after panning.
+        [-360, 0, 360].forEach(function (shift) {
+            data.points.forEach(function (pt) {
+                var lon = pt[0] + shift, lat = pt[1], p = pt[2];
+                L.rectangle([[lat - 0.5, lon - 0.5], [lat + 0.5, lon + 0.5]], {
+                    renderer: canvas,
+                    stroke: false,
+                    fillColor: auroraColor(p),
+                    fillOpacity: Math.min(0.12 + p / 90, 0.75),
+                    interactive: false
+                }).addTo(auroraLayer);
+            });
+        });
+    }
+
+    function showAuroraTime(data) {
+        var span = document.getElementById('aurora-time');
+        if (!span || !data || !data.forecastTime) return;
+        var t = new Date(data.forecastTime);
+        span.textContent = isNaN(t) ? data.forecastTime : t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
+    sky.auroraReady.then(function (data) { showAuroraTime(data); drawAurora(data); })
+        .catch(function () { sky.setStatus('Couldn’t load the aurora forecast right now.'); });
     setInterval(function () {
         if (document.hidden) return;
-        tick++;
-        updateIss();
-        if (tick % 60 === 0) { updateTracks(); updateNight(); }
-        if (tick % 600 === 0) loadAurora().catch(function () { /* keep last layer */ });
-    }, 1000);
+        sky.loadAurora().then(function (data) { showAuroraTime(data); drawAurora(data); }).catch(function () { });
+    }, 10 * 60 * 1000);
+
+    sky.on(function (type) {
+        if (type === 'view' && sky.state.view === 'map') {
+            init();
+            map.invalidateSize();
+            updateTracks();
+            updateMarkers();
+        }
+        if (!map || sky.state.view !== 'map') return;
+        if (type === 'tick') updateMarkers();
+        else if (type === 'minute') { updateTracks(); updateNight(); }
+        else if (type === 'select' || type === 'ready') {
+            updateMarkers();
+            var p = sky.position(sky.state.selected, new Date());
+            if (p && type === 'select') map.panTo([p.lat, sky.unwrapNear(p.lon, map.getCenter().lng)]);
+        }
+    });
 })();
