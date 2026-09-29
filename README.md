@@ -26,7 +26,7 @@ A web app I built that shows NASA's Astronomy Picture of the Day, the chance of 
 
 ## Background
 
-This started as my team's final project for CS 350 at South Puget Sound Community College. Since then I've kept building on it on my own: I took out the sign-up wall so anyone can use it, moved it to one server, started saving the photos so the archive doesn't break when NASA changes links, and added the live globe.
+This started as my team's final project for CS 350 at SPSCC. Since then I've kept building on it on my own: I took out the sign-up wall so anyone can use it, moved it to one server, started saving the photos so the archive doesn't break when NASA changes links, and added the live globe.
 
 ## Running it yourself
 
