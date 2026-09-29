@@ -7,6 +7,8 @@ A daily astronomy and space-weather digest. Each morning a scheduled Azure Funct
 - **Astronomy Picture of the Day** with title, explanation, and credit
 - **Space weather at a glance**: current Kp index, aurora chance, and solar wind speed, color-coded by severity
 - **3-day Kp forecast** bar chart
+- **Live Sky**: an interactive 3D globe (drag to spin) showing the International Space Station and the Hubble Space Telescope in real time at true altitude, with their orbits, NOAA's aurora forecast, and sunlight from the Sun's actual direction; plus a flat-map view with the day/night line
+- **Space theme**: twinkling starfield background, and a soft glow around each day's picture that takes on that picture's colors
 - **Archive**: pick any past date to see that day's digest
 - **Self-hosted image archive**: each day's picture is copied into our own storage, so the archive keeps working even when NASA changes its URLs (as it did when APOD moved from apod.nasa.gov to science.nasa.gov/apod)
 
@@ -23,6 +25,7 @@ flowchart LR
 
 - `src/TodayInSpace.Function` — .NET 8 isolated-worker Azure Function. Fetches APOD, current Kp, solar wind, and the Kp forecast, then writes a dated JSON digest plus `latest.json` to blob storage. Non-critical feeds degrade gracefully (the digest still publishes without them).
 - `src/TodayInSpace.Web` — .NET 10 ASP.NET Core MVC site. Reads digests from blob storage and serves archived images at `/images/{date}.{ext}` (storage stays private; responses are cacheable for a year since a day's image never changes). No database, no accounts.
+- **Live Sky** — `/api/sky/tle/{iss|hubble}` and `/api/sky/aurora` fetch CelesTrak orbital elements (whitelisted satellites only) and NOAA's OVATION aurora model server-side, cache them (6 h / 10 min, serving the last good copy if an upstream is down), and trim the aurora grid to meaningful points. The browser propagates the ISS orbit itself with [satellite.js](https://github.com/shashwatak/satellite-js) (SGP4), so the marker moves every second with no per-visitor API calls. The globe uses [globe.gl](https://github.com/vasturiano/globe.gl) (three.js) with NASA Blue Marble imagery and a directional light placed at the subsolar point; the flat map uses [Leaflet](https://leafletjs.com/) with CARTO dark tiles; the day/night terminator is computed from a low-precision solar position formula.
 - `src/TodayInSpace.Core` — shared logic used by both apps (image naming/validation).
 - `tests/TodayInSpace.Web.Tests` — xUnit tests for the space-weather classification and image naming/fallback logic.
 
@@ -79,4 +82,6 @@ Started as a team final project for CS 350 at South Puget Sound Community Colleg
 ## Data sources
 
 - [NASA APOD API](https://api.nasa.gov/)
-- [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/)
+- [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/) (Kp, solar wind, OVATION aurora forecast)
+- [CelesTrak](https://celestrak.org/) (ISS orbital elements)
+- Map tiles &copy; [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors &copy; [CARTO](https://carto.com/attributions)
