@@ -20,9 +20,9 @@ namespace TodayInSpace.Web.Controllers
             if (image == null)
                 return NotFound();
 
-            // An archived day's image never changes, so browsers and CDNs can cache it for a year.
-            // (Set only on success so a 404 isn't cached.)
-            Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            // Cache for a day: long enough to be fast, short enough that a corrected image
+            // (e.g. after NASA sent a placeholder) shows up. Set only on success so a 404 isn't cached.
+            Response.Headers.CacheControl = "public, max-age=86400";
             return File(image.Value.Content, image.Value.ContentType);
         }
     }

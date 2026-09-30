@@ -29,8 +29,10 @@ namespace TodayInSpace.Function
 
         // Returns the blob name on success (including when the image was already archived),
         // or null if there was nothing to archive or the download failed.
+        // overwrite=false (backfill) keeps an existing copy; the daily run passes true so a
+        // same-day re-run can replace a bad image.
         public static async Task<string?> ArchiveAsync(
-            BlobContainerClient images, string date, string? imageUrl, ILogger log)
+            BlobContainerClient images, string date, string? imageUrl, ILogger log, bool overwrite = false)
         {
             string? blobName = ApodImageNaming.GetBlobName(date, imageUrl);
             if (blobName == null)
@@ -41,7 +43,7 @@ namespace TodayInSpace.Function
                 await images.CreateIfNotExistsAsync();
                 var blob = images.GetBlobClient(blobName);
 
-                if (await blob.ExistsAsync())
+                if (!overwrite && await blob.ExistsAsync())
                     return blobName;
 
                 using var response = await http.GetAsync(imageUrl, HttpCompletionOption.ResponseHeadersRead);
