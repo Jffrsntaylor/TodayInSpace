@@ -1,0 +1,34 @@
+@*
+    Page description, icons, and link-preview tags (Open Graph / Twitter) so the site shows
+    a proper card when shared on LinkedIn, in messages, etc. Pages can override the title
+    and description with ViewData["OgTitle"] / ViewData["OgDescription"].
+*@
+@{
+    var site = "https://" + Context.Request.Host.Value;
+    var ogTitle = ViewData["OgTitle"] as string ?? "Today in Space";
+    var ogDescription = ViewData["OgDescription"] as string
+        ?? "NASA's picture of the day, the aurora forecast, and a live 3D tracker for the ISS and Hubble.";
+    var pageUrl = site + Context.Request.Path;
+    var imageUrl = site + "/img/og-image.png";
+}
+<meta name="description" content="@ogDescription" />
+<meta name="theme-color" content="#04060d" />
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="canonical" href="@pageUrl" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Today in Space" />
+<meta property="og:title" content="@ogTitle" />
+<meta property="og:description" content="@ogDescription" />
+<meta property="og:url" content="@pageUrl" />
+<meta property="og:image" content="@imageUrl" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Today in Space: a 3D globe tracking the ISS and the Hubble Space Telescope" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="@ogTitle" />
+<meta name="twitter:description" content="@ogDescription" />
+<meta name="twitter:image" content="@imageUrl" />
