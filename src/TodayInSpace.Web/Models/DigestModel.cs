@@ -43,6 +43,13 @@ namespace TodayInSpace.Web.Models
         // If it differs from the digest's date, NASA was down and the last good picture was reused.
         [JsonPropertyName("date")]
         public string? Date { get; set; }
+
+        // Video days: the video URL and a still image. Older digests don't have these.
+        [JsonPropertyName("videoUrl")]
+        public string? VideoUrl { get; set; }
+
+        [JsonPropertyName("thumbnailUrl")]
+        public string? ThumbnailUrl { get; set; }
     }
 
     // Space weather section

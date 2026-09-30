@@ -205,7 +205,7 @@ namespace TodayInSpace.Function
         // Calls NASA's APOD API, trying twice with a short pause. Returns null if it's unavailable.
         private async Task<ApodInfo?> FetchApodAsync(string nasaKey, string today)
         {
-            string apodUrl = $"https://api.nasa.gov/planetary/apod?api_key={nasaKey}";
+            string apodUrl = $"https://api.nasa.gov/planetary/apod?api_key={nasaKey}&thumbs=true";
             for (int attempt = 1; attempt <= 2; attempt++)
             {
                 try
@@ -214,8 +214,9 @@ namespace TodayInSpace.Function
                     using var doc = JsonDocument.Parse(apodJson);
                     var root = doc.RootElement;
 
-                    // APOD is sometimes a video. If so, we still keep title/explanation
-                    // but leave the image URL empty (the UI shows a graceful fallback).
+                    // APOD is sometimes a video: keep its URL (the site embeds known players/files)
+                    // and the thumbnail NASA provides with thumbs=true.
+                    bool isVideo = GetString(root, "media_type") == "video";
                     string imageUrl = GetString(root, "media_type") == "image" ? GetString(root, "url") : "";
                     string apodDate = GetString(root, "date");
                     string title = GetString(root, "title");
@@ -234,6 +235,8 @@ namespace TodayInSpace.Function
                         explanation    = GetString(root, "explanation"),
                         imageUrl       = imageUrl,
                         sourceImageUrl = imageUrl,
+                        videoUrl       = isVideo ? GetString(root, "url") : "",
+                        thumbnailUrl   = isVideo ? GetString(root, "thumbnail_url") : "",
                         copyright      = GetString(root, "copyright"),
                         date           = string.IsNullOrEmpty(apodDate) ? today : apodDate
                     };
@@ -262,7 +265,7 @@ namespace TodayInSpace.Function
                 }
 
                 _logger.LogInformation("Using the APOD RSS feed for {today}: {title}", today, entry.Title);
-                return new ApodInfo
+                var apod = new ApodInfo
                 {
                     title          = entry.Title,
                     explanation    = entry.Explanation,
@@ -271,6 +274,29 @@ namespace TodayInSpace.Function
                     copyright      = entry.Copyright,
                     date           = entry.Date
                 };
+
+                // The feed doesn't say whether the day is a video. The article page does (og:video),
+                // so check it; on video days show the video with NASA's snapshot as the thumbnail.
+                if (Uri.TryCreate(entry.ArticleUrl, UriKind.Absolute, out var article) &&
+                    article.Host.EndsWith("science.nasa.gov", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var media = ApodSources.ParseArticleMedia(await http.GetStringAsync(article));
+                        if (!string.IsNullOrEmpty(media.VideoUrl))
+                        {
+                            apod.videoUrl = media.VideoUrl;
+                            apod.thumbnailUrl = media.ImageUrl;
+                            apod.imageUrl = apod.sourceImageUrl = "";
+                            _logger.LogInformation("{today} is a video day: {video}", today, media.VideoUrl);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning("Couldn't check the APOD article page for a video: {msg}", ex.Message);
+                    }
+                }
+                return apod;
             }
             catch (Exception ex)
             {
@@ -361,6 +387,9 @@ namespace TodayInSpace.Function
         public string? imageBlob { get; set; }
         // NASA's original image URL, kept for reference/credit.
         public string sourceImageUrl { get; set; } = "";
+        // Video days: the video (YouTube/Vimeo/NASA .mp4) and a still for previews.
+        public string videoUrl { get; set; } = "";
+        public string thumbnailUrl { get; set; } = "";
     }
     public class SpaceWeatherInfo
     {

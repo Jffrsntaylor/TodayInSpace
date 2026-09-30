@@ -6,7 +6,7 @@ using System.Xml.Linq;
 namespace TodayInSpace.Core
 {
     // A day's picture as read from one of NASA's sources.
-    public record ApodEntry(string Title, string Explanation, string ImageUrl, string Copyright, string Date);
+    public record ApodEntry(string Title, string Explanation, string ImageUrl, string Copyright, string Date, string ArticleUrl = "");
 
     // Checks and parsing for NASA's APOD sources.
     // After APOD moved to science.nasa.gov (Sept 2026), the api.nasa.gov endpoint sometimes returns
@@ -65,9 +65,29 @@ namespace TodayInSpace.Core
                 if (!LooksLikeRealApod(title, explanation, image))
                     return null;
 
-                return new ApodEntry(title, explanation, image, copyright, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                return new ApodEntry(title, explanation, image, copyright, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), link);
             }
             return null;
+        }
+
+        // Reads the main media from an APOD article page on science.nasa.gov. Video days publish
+        // og:video (e.g. an .mp4) with a snapshot in og:image; picture days have only og:image.
+        public static (string VideoUrl, string ImageUrl) ParseArticleMedia(string? html)
+        {
+            if (string.IsNullOrWhiteSpace(html))
+                return ("", "");
+            return (MetaContent(html, "og:video:secure_url") is { Length: > 0 } v ? v : MetaContent(html, "og:video"),
+                    MetaContent(html, "og:image"));
+        }
+
+        private static string MetaContent(string html, string property)
+        {
+            // Accepts either attribute order: property/name first or content first.
+            string p = Regex.Escape(property);
+            var m = Regex.Match(html, $@"<meta[^>]+(?:property|name)\s*=\s*[""']{p}[""'][^>]*content\s*=\s*[""']([^""']+)[""']", RegexOptions.IgnoreCase);
+            if (!m.Success)
+                m = Regex.Match(html, $@"<meta[^>]+content\s*=\s*[""']([^""']+)[""'][^>]*(?:property|name)\s*=\s*[""']{p}[""']", RegexOptions.IgnoreCase);
+            return m.Success ? WebUtility.HtmlDecode(m.Groups[1].Value.Trim()) : "";
         }
 
         // Strips HTML tags and entities and collapses whitespace.

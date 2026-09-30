@@ -19,6 +19,20 @@ namespace TodayInSpace.Web.Helpers
             return string.IsNullOrWhiteSpace(apod.ImageUrl) ? null : apod.ImageUrl;
         }
 
+        // Video days: how to embed the video (null if there's no video or the host isn't one we allow).
+        public static VideoEmbed? GetVideo(ApodInfo? apod) => ApodVideo.ToEmbed(apod?.VideoUrl);
+
+        // Image used for the soft glow behind the frame: the picture, or a video's thumbnail.
+        public static string? GetGlowUrl(ApodInfo? apod)
+        {
+            if (GetDisplayUrl(apod) is string img)
+                return img;
+            string? thumb = apod?.ThumbnailUrl;
+            return !string.IsNullOrWhiteSpace(thumb) && Uri.TryCreate(thumb, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+                ? thumb
+                : null;
+        }
+
         // When NASA's API was down during the daily update, the digest reuses the last good picture.
         // Returns that picture's original date so the page can say so; null when the picture is current.
         public static DateTime? GetCarriedOverDate(DigestModel? digest)
