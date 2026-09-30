@@ -30,7 +30,7 @@ This started as my team's final project for CS 350 at SPSCC. Since then I've kep
 
 ## Running it yourself
 
-You'll need the .NET 10 SDK (and .NET 8 + Azure Functions Core Tools for the function).
+You'll need the .NET 10 SDK (and Azure Functions Core Tools to run the function locally).
 
 ```bash
 cd src/TodayInSpace.Web
