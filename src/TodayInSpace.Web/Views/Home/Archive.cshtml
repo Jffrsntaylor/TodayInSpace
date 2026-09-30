@@ -88,16 +88,35 @@
             {
                 <section class="apod">
                     <div class="section-label">Astronomy Picture of the Day</div>
-                    @{ var displaySrc = ApodImageHelper.GetDisplayUrl(Model.Apod); }
+                    @{
+                        var displaySrc = ApodImageHelper.GetDisplayUrl(Model.Apod);
+                        var video = displaySrc == null ? ApodImageHelper.GetVideo(Model.Apod) : null;
+                        var glowSrc = ApodImageHelper.GetGlowUrl(Model.Apod);
+                    }
                     <div class="apod-stage">
-                        @if (displaySrc != null)
+                        @if (glowSrc != null)
                         {
-                            <img class="apod-ambient" src="@displaySrc" alt="" aria-hidden="true" />
+                            <img class="apod-ambient" src="@glowSrc" alt="" aria-hidden="true" />
                         }
                         <div class="apod-frame">
-                            @if (ApodImageHelper.GetDisplayUrl(Model.Apod) is string imageSrc)
+                            @if (displaySrc != null)
                             {
-                                <img src="@imageSrc" alt="@Model.Apod.Title" />
+                                <img src="@displaySrc" alt="@Model.Apod.Title" />
+                            }
+                            else if (video != null && video.Kind == VideoKind.Iframe)
+                            {
+                                <iframe src="@video.Src" title="@Model.Apod.Title" loading="lazy"
+                                        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                        allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                            }
+                            else if (video != null && video.Kind == VideoKind.File)
+                            {
+                                <video src="@video.Src" poster="@glowSrc" controls playsinline preload="metadata"
+                                       aria-label="@Model.Apod.Title"></video>
+                            }
+                            else
+                            {
+                                <span class="placeholder">Image unavailable</span>
                             }
                         </div>
                     </div>
