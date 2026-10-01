@@ -15,4 +15,5 @@ disable-model-invocation: true
    - **How to check it**: what to click on the live site after deploy
    - **Tests**: what was added
    - **Noticed, not changed**: anything out of scope (omit if none)
-6. Report back with the PR link. Jeff reviews and merges. Never merge it yourself.
+6. Report back with the PR link, then stop. Merge only if Jeff asks: check `gh pr checks <n>` is green first,
+   then `gh pr merge <n> --merge` (merge commits, matching the repo's history).

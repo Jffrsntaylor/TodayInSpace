@@ -7,7 +7,8 @@ Recruiters read this repo. Keep code readable, commits clean, and the README sim
 
 ## How we work
 
-- **Jeff** owns the project and merges every PR.
+- **Jeff** owns the project and decides when each PR merges. Claude Code may merge a PR only when Jeff
+  asks in chat, and only after CI is green. A merge to `main` deploys, so never merge on your own initiative.
 - **Claude in Cowork** is the lead engineer. It plans the work, writes task briefs, and reviews PRs.
 - **You (Claude Code)** are the engineer who builds. Briefs live in `.claude/briefs/<name>.md` (gitignored).
   Run `/build-brief <name>` to do one end to end. For small asks, Jeff may just tell you directly.
