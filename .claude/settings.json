@@ -16,6 +16,7 @@
       "Bash(git checkout -b *)",
       "Bash(git add *)",
       "Bash(git commit *)",
+      "Bash(gh pr merge *)",
       "Bash(gh pr view *)",
       "Bash(gh pr checks *)",
       "Bash(gh pr list *)"
@@ -30,7 +31,6 @@
       "Bash(git push origin main *)",
       "Bash(git push origin main)",
       "Bash(git reset --hard *)",
-      "Bash(gh pr merge *)",
       "Bash(az *)",
       "Read(**/local.settings.json)",
       "Read(**/*.PublishSettings)",
