@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using TodayInSpace.Web.Health;
 using TodayInSpace.Web.Services;
 using TodayInSpace.Web.Sky;
 
@@ -14,6 +17,16 @@ builder.Services.AddHttpClient<SkyDataService>(client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TodayInSpace/1.0 (+https://github.com/Jffrsntaylor/TodayInSpace)");
 });
 
+// /healthz: can we read storage, and did the daily function publish recently?
+builder.Services.AddHealthChecks()
+    .AddCheck<StorageHealthCheck>("storage")
+    .AddCheck<FreshnessHealthCheck>("freshness");
+
+// Telemetry goes to Application Insights only when Azure sets the connection string.
+// Local runs and CI don't have it, so they skip this entirely.
+if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddApplicationInsightsTelemetry();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -26,6 +39,18 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.MapStaticAssets();
+
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+{
+    ResponseWriter = HealthResponse.WriteAsync,
+    // Degraded (a missed run) still serves pages, so only Unhealthy returns 503.
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+    }
+});
 
 app.MapControllerRoute(
     name: "default",

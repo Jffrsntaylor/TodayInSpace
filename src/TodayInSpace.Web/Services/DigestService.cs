@@ -18,6 +18,9 @@ namespace TodayInSpace.Web.Services
             _imagesContainer = config["Storage:ImagesContainerName"] ?? "images";
         }
 
+        // False on a machine without storage settings (e.g. a fresh clone); the health check reports it.
+        public bool IsConfigured => !string.IsNullOrEmpty(_connStr) && !string.IsNullOrEmpty(_container);
+
         // Opens an archived APOD image for streaming. Returns null if the name isn't one
         // we generate, storage isn't configured, or the image doesn't exist.
         public async Task<(Stream Content, string ContentType)?> OpenImageAsync(string name)
