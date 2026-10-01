@@ -29,6 +29,10 @@ jobs:
       - name: Test
         run: dotnet test TodayInSpace.slnx --configuration Release --no-build --verbosity normal
 
+      # Compile-only check of the Bicep template. No login, no deployment.
+      - name: Build Bicep
+        run: az bicep build --file infra/main.bicep
+
       - name: Publish web app
         run: dotnet publish src/TodayInSpace.Web/TodayInSpace.Web.csproj -c Release -o out/web --no-build
 
