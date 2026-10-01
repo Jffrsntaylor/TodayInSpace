@@ -26,6 +26,8 @@
     string selectedDate = ViewBag.SelectedDate as string ?? "";
     bool noDateChosen = ViewBag.NoDateChosen ?? false;
     bool notFound = ViewBag.NotFound ?? false;
+    string? prevDate = ViewBag.PrevDate as string;
+    string? nextDate = ViewBag.NextDate as string;
 
     string prettyDate = "";
     if (!string.IsNullOrEmpty(Model?.Date) && DateTime.TryParse(Model.Date, out var d))
@@ -66,6 +68,18 @@
             <input type="date" id="date" name="date" max="@today" value="@selectedDate" />
             <button type="submit">View</button>
         </form>
+
+        @* Only a valid date has neighbors, so an unparseable ?date= shows no arrows. *@
+        @if (prevDate != null)
+        {
+            <nav class="day-nav" aria-label="Previous and next day">
+                <a href="/Home/Archive?date=@prevDate" rel="prev">&larr; Previous day</a>
+                @if (nextDate != null)
+                {
+                    <a href="/Home/Archive?date=@nextDate" rel="next">Next day &rarr;</a>
+                }
+            </nav>
+        }
 
         @if (noDateChosen)
         {
@@ -164,5 +178,21 @@
 
     </div>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
+    @if (prevDate != null)
+    {
+        <script>
+            // Left/Right arrow keys follow the day links. Skipped while typing in the
+            // date picker and on a focused video, where the arrows seek.
+            document.addEventListener('keydown', function (e) {
+                if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+                var t = e.target;
+                if (t instanceof Element && (t.isContentEditable || t.closest('input, textarea, select, video'))) return;
+
+                var rel = e.key === 'ArrowLeft' ? 'prev' : e.key === 'ArrowRight' ? 'next' : null;
+                var link = rel && document.querySelector('.day-nav a[rel="' + rel + '"]');
+                if (link) location.href = link.href;
+            });
+        </script>
+    }
 </body>
 </html>
