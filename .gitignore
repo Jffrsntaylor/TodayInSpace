@@ -363,3 +363,8 @@ MigrationBackup/
 FodyWeavers.xsd
 # Azure Functions local settings (contain connection strings)
 local.settings.json
+
+# Claude Code: personal settings and task briefs (shared settings + skills are committed)
+.claude/settings.local.json
+.claude/briefs/
+CLAUDE.local.md
