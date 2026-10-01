@@ -20,6 +20,7 @@ A web app I built that shows NASA's Astronomy Picture of the Day, the chance of 
 - An **Azure Function** runs every morning. It pulls the photo from NASA and the space weather from NOAA, then saves that day's data and a copy of the image to **Azure Blob Storage**.
 - The website is **ASP.NET Core MVC (C#)**. It reads from storage instead of calling NASA on every page load, so it stays fast and every past day is kept.
 - The globe works out where each satellite is right in the browser, using its latest orbit data (JavaScript with globe.gl and satellite.js).
+- `/healthz` reports whether the site can read storage and whether the daily update ran on time, so I can catch a NASA outage before a visitor does.
 - **GitHub Actions** builds the project, runs the tests, and deploys to Azure every time I push to `main`.
 
 **Built with:** C#, .NET, ASP.NET Core MVC, Azure App Service, Azure Functions, Azure Blob Storage, JavaScript, xUnit, GitHub Actions

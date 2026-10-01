@@ -34,24 +34,31 @@ namespace TodayInSpace.Function
             string connStr   = Environment.GetEnvironmentVariable("Storage__ConnectionString") ?? "";
             string container = Environment.GetEnvironmentVariable("Storage__ContainerName") ?? "digests";
 
+            string today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
             if (string.IsNullOrEmpty(connStr))
             {
-                _logger.LogError("Storage connection string missing. Aborting.");
+                LogNotPublished(today, "storage not configured", ApodSource.None);
                 return;
             }
-
-            string today = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
             var containerClient = new BlobContainerClient(connStr, container);
 
             // ---- 1. NASA APOD ----
             // If NASA's API is down, don't lose the whole day: still publish the space weather
             // and carry over the last good picture (its own "date" tells the site it's from earlier).
-            ApodInfo? apod = await FetchApodAsync(nasaKey, today) ?? await FetchApodFromRssAsync(today);
+            string apodSource = ApodSource.Api;
+            ApodInfo? apod = await FetchApodAsync(nasaKey, today);
+            if (apod == null)
+            {
+                apodSource = ApodSource.Rss;
+                apod = await FetchApodFromRssAsync(today);
+            }
             bool apodIsFresh = apod != null;
             if (apod == null)
             {
                 apod = await LoadPreviousApodAsync(containerClient, today);
+                apodSource = apod != null ? ApodSource.CarriedOver : ApodSource.None;
                 _logger.LogWarning(apod != null
                     ? "APOD unavailable; carrying over the picture from {date}."
                     : "APOD unavailable and no previous picture found; publishing space weather only.",
@@ -194,12 +201,33 @@ namespace TodayInSpace.Function
                 await UploadAsync(containerClient, $"{today}.json", digestJson);
                 await UploadAsync(containerClient, "latest.json", digestJson);
 
-                _logger.LogInformation("Digest written for {today} (and latest.json).", today);
+                // One line per run with named properties, so App Insights can chart and alert on it.
+                _logger.LogInformation(
+                    "Digest published {Date} apodSource={ApodSource} imageArchived={ImageArchived} kp={Kp} solarWind={SolarWind}",
+                    today, apodSource, apod?.imageBlob != null, currentKp, solarWindSpeed);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Blob write failed: {msg}", ex.Message);
+                _logger.LogWarning("Blob write failed: {msg}", ex.Message);
+                LogNotPublished(today, "blob write failed", apodSource);
             }
+        }
+
+        // Where today's picture came from, as it appears in the run summary.
+        private static class ApodSource
+        {
+            public const string Api = "api";
+            public const string Rss = "rss";
+            public const string CarriedOver = "carried-over";
+            public const string None = "none";
+        }
+
+        // Error level on purpose: an alert fires on this line, because a day without a digest
+        // is exactly what went unnoticed during past NASA outages.
+        private void LogNotPublished(string date, string reason, string apodSource)
+        {
+            _logger.LogError("Digest not published {Date} reason={Reason} apodSource={ApodSource}",
+                date, reason, apodSource);
         }
 
         // Calls NASA's APOD API, trying twice with a short pause. Returns null if it's unavailable.
