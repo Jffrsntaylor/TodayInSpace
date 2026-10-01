@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet restore *)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr list *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(gh pr create *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin main)",
+      "Bash(git reset --hard *)",
+      "Bash(az *)",
+      "Read(**/local.settings.json)",
+      "Read(**/*.PublishSettings)",
+      "Read(**/*.pubxml.user)",
+      "Read(**/secrets.json)"
+    ]
+  }
+}
