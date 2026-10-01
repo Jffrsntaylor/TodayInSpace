@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TodayInSpace.Core;
 using TodayInSpace.Web.Models;
 using TodayInSpace.Web.Services;
 using System.Diagnostics;
@@ -27,6 +28,12 @@ namespace TodayInSpace.Web.Controllers
         {
             // Pass the selected date back to the view so the picker stays on it.
             ViewBag.SelectedDate = date;
+
+            // Previous/next day links. Set before the lookup so they still show on
+            // "No forecast found", letting people step past a missing day.
+            var (prevDate, nextDate) = ArchiveNav.GetNeighbors(date, DateOnly.FromDateTime(DateTime.UtcNow));
+            ViewBag.PrevDate = prevDate;
+            ViewBag.NextDate = nextDate;
 
             if (string.IsNullOrWhiteSpace(date))
             {
