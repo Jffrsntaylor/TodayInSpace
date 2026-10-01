@@ -141,18 +141,11 @@
         });
     }
 
-    function showAuroraTime(data) {
-        var span = document.getElementById('aurora-time');
-        if (!span || !data || !data.forecastTime) return;
-        var t = new Date(data.forecastTime);
-        span.textContent = isNaN(t) ? data.forecastTime : t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    }
-
-    sky.auroraReady.then(function (data) { showAuroraTime(data); drawAurora(data); })
-        .catch(function () { sky.setStatus('Couldn’t load the aurora forecast right now.'); });
+    // sky-core.js shows the forecast time and any load error; this just draws the ovals.
+    sky.auroraReady.then(drawAurora).catch(function () { });
     setInterval(function () {
         if (document.hidden) return;
-        sky.loadAurora().then(function (data) { showAuroraTime(data); drawAurora(data); }).catch(function () { });
+        sky.loadAurora().then(drawAurora).catch(function () { });
     }, 10 * 60 * 1000);
 
     sky.on(function (type) {
@@ -171,4 +164,8 @@
             if (p && type === 'select') map.panTo([p.lat, sky.unwrapNear(p.lon, map.getCenter().lng)]);
         }
     });
+
+    // sky-loader.js loads this file after the Map view is already showing, so the 'view'
+    // event that would normally create the map has been and gone.
+    if (sky.state.view === 'map') init();
 })();

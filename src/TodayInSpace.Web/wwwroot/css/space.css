@@ -307,6 +307,14 @@ a { color: var(--accent); }
     background: radial-gradient(circle at 50% 50%, rgba(122, 162, 255, 0.08), transparent 60%);
 }
 .sky-globe:active { cursor: grabbing; }
+/* Shown while sky-loader.js fetches globe.gl; sky-globe.js removes it. */
+.sky-loading {
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Sora', sans-serif; font-weight: 600; font-size: 14px;
+    color: var(--ink-faint);
+    cursor: default;
+}
 .sky-globe[hidden], .sky-map[hidden] { display: none; }
 
 /* Globe / Map toggle and satellite picker */

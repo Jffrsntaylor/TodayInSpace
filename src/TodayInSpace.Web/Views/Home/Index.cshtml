@@ -1,7 +1,11 @@
 @model TodayInSpace.Web.Models.DigestModel
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersion
 @{
     ViewData["Title"] = "Today in Space";
     Layout = null;
+
+    // Same ?v= hash asp-append-version adds, for scripts sky-loader.js injects later.
+    string Versioned(string path) => FileVersion.AddFileVersionToPath(Context.Request.PathBase, Url.Content(path));
 
     var sw = Model?.SpaceWeather;
     int kp = sw?.CurrentKp ?? -1;
@@ -38,7 +42,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
     <link rel="stylesheet" href="~/css/space.css" asp-append-version="true" />
 </head>
 <body>
@@ -152,7 +155,13 @@
             }
         }
 
-        <section class="sky">
+        @* sky-loader.js reads these to load the globe and map libraries only when they're needed. *@
+        <section class="sky"
+                 data-globe-lib="@Url.Content("~/lib/globe.gl/globe.gl.min.js")"
+                 data-globe-src="@Versioned("~/js/sky-globe.js")"
+                 data-leaflet-css="@Url.Content("~/lib/leaflet/leaflet.css")"
+                 data-leaflet-js="@Url.Content("~/lib/leaflet/leaflet.js")"
+                 data-map-src="@Versioned("~/js/sky-map.js")">
             <div class="sky-head">
                 <div class="section-label">Live Sky</div>
                 <div class="view-toggle" role="tablist" aria-label="Live Sky view">
@@ -161,7 +170,7 @@
                 </div>
             </div>
             <div class="sky-panel">
-                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" aria-label="3D globe showing the International Space Station and the Hubble Space Telescope, their orbits, and tonight's aurora forecast. Drag to rotate."></div>
+                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" aria-label="3D globe showing the International Space Station and the Hubble Space Telescope, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
                 <div id="sky-map" class="sky-map" hidden aria-label="World map showing the International Space Station and the Hubble Space Telescope, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
                 <div class="sky-readout">
                     <div class="sat-title">
@@ -198,12 +207,9 @@
         </footer>
 
     </div>
-    <script src="~/lib/leaflet/leaflet.js"></script>
     <script src="~/lib/satellite.js/satellite.min.js"></script>
-    <script src="~/lib/globe.gl/globe.gl.min.js"></script>
     <script src="~/js/sky-core.js" asp-append-version="true"></script>
-    <script src="~/js/sky-map.js" asp-append-version="true"></script>
-    <script src="~/js/sky-globe.js" asp-append-version="true"></script>
+    <script src="~/js/sky-loader.js" asp-append-version="true"></script>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
 </body>
 </html>

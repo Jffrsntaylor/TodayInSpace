@@ -8,6 +8,9 @@
     var el = document.getElementById('sky-globe');
     if (!sky || !el) return;
 
+    // Clear the "Loading 3D globe…" placeholder that shows while sky-loader.js fetches globe.gl.
+    el.textContent = '';
+
     function webglAvailable() {
         try {
             var c = document.createElement('canvas');
@@ -216,6 +219,10 @@
             }
         }
     });
+
+    // The globe loads lazily, so the visitor may already be on the map. Don't render
+    // in the background; the 'view' event resizes and resumes it when they switch back.
+    if (sky.state.view !== 'globe') globe.pauseAnimation();
 
     updateSun();
     sky.auroraReady.then(showAurora).catch(function () { /* map legend shows status */ });

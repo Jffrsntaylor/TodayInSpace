@@ -101,8 +101,20 @@ window.TISSky = (function () {
         return failed;
     });
 
-    function loadAurora() { return getJson('/api/sky/aurora'); }
+    // The "valid around" time sits in the note under both views, so it's set here rather than
+    // in sky-map.js, which only loads once someone opens the map.
+    function showAuroraTime(data) {
+        var span = document.getElementById('aurora-time');
+        if (!span || !data || !data.forecastTime) return;
+        var t = new Date(data.forecastTime);
+        span.textContent = isNaN(t) ? data.forecastTime : t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function loadAurora() {
+        return getJson('/api/sky/aurora').then(function (data) { showAuroraTime(data); return data; });
+    }
     var auroraReady = loadAurora();
+    auroraReady.catch(function () { setStatus('Couldn’t load the aurora forecast right now.'); });
 
     // ---- UI: readouts, satellite picker, follow, view toggle ----
     var $ = function (id) { return document.getElementById(id); };
