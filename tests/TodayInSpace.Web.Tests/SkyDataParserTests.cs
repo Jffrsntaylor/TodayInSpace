@@ -120,6 +120,33 @@ namespace TodayInSpace.Web.Tests
             Assert.Single(snap!.Points);
         }
 
+        [Fact]
+        public void ParseOvation_DropsTheEquatorRowNoaaSometimesReports()
+        {
+            // Real rows from the 2026-10-05 22:16 UTC forecast: a 5-6% strip at lat 0, plus a normal oval point.
+            var snap = SkyDataParser.ParseOvation(
+                @"{""coordinates"": [[280, 0, 5], [303, 0, 6], [340, 0, 6], [0, -77, 32]]}", 5)!;
+
+            Assert.Single(snap.Points);
+            Assert.Equal(new[] { 0, -77, 32 }, snap.Points[0]);
+        }
+
+        [Theory]
+        [InlineData(30, true)]
+        [InlineData(-30, true)]
+        [InlineData(29, false)]
+        [InlineData(-29, false)]
+        [InlineData(29.6, true)]   // rounds to 30
+        [InlineData(90, true)]
+        [InlineData(-90, true)]
+        public void ParseOvation_KeepsOnlyPointsAtOrPoleward_OfMinLatitude(double lat, bool kept)
+        {
+            string json = @"{""coordinates"": [[100, " + lat.ToString(System.Globalization.CultureInfo.InvariantCulture) + @", 20]]}";
+            var snap = SkyDataParser.ParseOvation(json, 5)!;
+
+            Assert.Equal(kept ? 1 : 0, snap.Points.Count);
+        }
+
         [Theory]
         [InlineData(0, 0)]
         [InlineData(179, 179)]

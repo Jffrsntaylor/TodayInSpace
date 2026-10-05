@@ -39,6 +39,12 @@ namespace TodayInSpace.Web.Sky
             return line.Length >= 69 && line[0] == number && line[1] == ' ';
         }
 
+        // Points closer to the equator than this are dropped. OVATION sometimes reports a one-cell-wide
+        // row of 5-6% "aurora" along the equator itself (seen Oct 2026 at lat 0, 80°W-20°W), which drew a
+        // green stripe across South America. Aurora within 30° of the equator only happens in rare historic
+        // storms, and never as a thin 5% band, so this removes the glitch without touching the polar ovals.
+        public const int AuroraMinAbsLatitude = 30;
+
         // Parses NOAA's ovation_aurora_latest.json and keeps only points at or above minProbability,
         // converting longitude from 0..359 to -180..180 for the map. Returns null if the shape is unexpected.
         public static AuroraSnapshot? ParseOvation(string? json, int minProbability)
@@ -69,8 +75,12 @@ namespace TodayInSpace.Web.Sky
                     if (p < minProbability)
                         continue;
 
+                    int roundedLat = (int)Math.Round(lat);
+                    if (Math.Abs(roundedLat) < AuroraMinAbsLatitude)
+                        continue;
+
                     int lon180 = NormalizeLongitude((int)Math.Round(lon));
-                    points.Add(new[] { lon180, (int)Math.Round(lat), p });
+                    points.Add(new[] { lon180, roundedLat, p });
                 }
 
                 return new AuroraSnapshot(

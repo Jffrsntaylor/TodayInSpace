@@ -75,6 +75,8 @@
         if (lastAurora) drawAurora(lastAurora);
     }
 
+    // Same rule as the globe: the selected satellite gets its next orbit bold plus its last half-orbit
+    // dashed; the others get only their next orbit, thin and dim, so the map isn't a tangle of six lines.
     function updateTracks() {
         if (!map) return;
         var center = map.getCenter().lng;
@@ -82,11 +84,13 @@
             var layers = satLayers[s.id];
             var now = sky.position(s.id, new Date());
             if (!layers || !now) return;
+            var selected = s.id === sky.state.selected;
             var ref = sky.unwrapNear(now.lon, center);
             var period = sky.periodMinutes(s.id);
             var toLatLng = function (pt) { return [pt.lat, pt.lon]; };
-            layers.past.setLatLngs(sky.track(s.id, 0, -period / 2, 30, ref).map(toLatLng));
+            layers.next.setStyle(selected ? { weight: 2.5, opacity: 0.95 } : { weight: 1.2, opacity: 0.5 });
             layers.next.setLatLngs(sky.track(s.id, 0, period, 30, ref).map(toLatLng));
+            layers.past.setLatLngs(selected ? sky.track(s.id, 0, -period / 2, 30, ref).map(toLatLng) : []);
         });
     }
 
@@ -159,6 +163,7 @@
         if (type === 'tick') updateMarkers();
         else if (type === 'minute') { updateTracks(); updateNight(); }
         else if (type === 'select' || type === 'ready') {
+            updateTracks();   // the bold orbit and the past track follow the selection
             updateMarkers();
             var p = sky.position(sky.state.selected, new Date());
             if (p && type === 'select') map.panTo([p.lat, sky.unwrapNear(p.lon, map.getCenter().lng)]);
