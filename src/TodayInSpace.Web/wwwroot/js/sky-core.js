@@ -7,7 +7,8 @@ window.TISSky = (function () {
 
     var SATS = [
         { id: 'iss', name: 'ISS', full: 'International Space Station', color: '#b7c0ff' },
-        { id: 'hubble', name: 'Hubble', full: 'Hubble Space Telescope', color: '#ffc46b' }
+        { id: 'hubble', name: 'Hubble', full: 'Hubble Space Telescope', color: '#ffc46b' },
+        { id: 'tiangong', name: 'Tiangong', full: 'Tiangong Space Station', color: '#5fd3e6' }
     ];
 
     var rad = function (d) { return d * Math.PI / 180; };

@@ -12,7 +12,7 @@ A web app I built that shows NASA's Astronomy Picture of the Day, the chance of 
 
 - See today's space photo from NASA
 - Check the space weather and how likely the aurora is tonight
-- Spin the globe and watch the ISS and Hubble move along their orbits (click one to follow it)
+- Spin the globe and watch the ISS, Hubble and China's Tiangong station move along their orbits (click one to follow it)
 - Go back to any past day in the archive
 
 ## How it works

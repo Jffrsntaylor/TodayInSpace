@@ -1,5 +1,5 @@
 // 3D globe view for Live Sky (globe.gl / three.js): drag to rotate, scroll or pinch to zoom,
-// click a satellite to select it. Shows ISS and Hubble at true relative altitude with their orbits,
+// click a satellite to select it. Shows ISS, Hubble and Tiangong at true relative altitude with their orbits,
 // the aurora forecast, and sunlight coming from the Sun's real direction.
 (function () {
     'use strict';
