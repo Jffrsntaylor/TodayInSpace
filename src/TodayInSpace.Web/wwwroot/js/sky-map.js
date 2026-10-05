@@ -45,8 +45,9 @@
 
         var overlays = {};
         sky.SATS.forEach(function (s) {
-            var past = L.polyline([], { renderer: canvas, color: s.color, weight: 1.5, opacity: 0.45, dashArray: '3 6', interactive: false });
-            var next = L.polyline([], { renderer: canvas, color: s.color, weight: 2, opacity: 0.9, interactive: false });
+            // Each track is a group of short polylines so it can fade out along its length.
+            var past = L.layerGroup();
+            var next = L.layerGroup();
             var icon = L.divIcon({
                 className: 'map-sat map-sat--' + s.id,
                 html: '<span class="map-sat__pulse"></span><span class="map-sat__dot"></span><span class="map-sat__label">' + s.name + '</span>',
@@ -75,8 +76,26 @@
         if (lastAurora) drawAurora(lastAurora);
     }
 
+    // Leaflet lines have a single opacity, so a fading track is drawn as bands whose opacity steps
+    // from `from` at the first point to `to` at the last. Enough bands that the steps don't show.
+    var FADE_BANDS = 24;
+    function drawFaded(group, latlngs, style, from, to) {
+        group.clearLayers();
+        var last = latlngs.length - 1;
+        var bands = Math.min(FADE_BANDS, last);
+        for (var i = 0; i < bands; i++) {
+            var a = Math.floor(i * last / bands), b = Math.floor((i + 1) * last / bands);
+            group.addLayer(L.polyline(latlngs.slice(a, b + 1), L.extend({
+                renderer: canvas,
+                opacity: from + (to - from) * (i + 0.5) / bands,
+                interactive: false
+            }, style)));
+        }
+    }
+
     // Same rule as the globe: the selected satellite gets its next orbit bold plus its last half-orbit
     // dashed; the others get only their next orbit, thin and dim, so the map isn't a tangle of six lines.
+    // Every track fades out at its far end, so no line stops with a hard edge.
     function updateTracks() {
         if (!map) return;
         var center = map.getCenter().lng;
@@ -88,9 +107,11 @@
             var ref = sky.unwrapNear(now.lon, center);
             var period = sky.periodMinutes(s.id);
             var toLatLng = function (pt) { return [pt.lat, pt.lon]; };
-            layers.next.setStyle(selected ? { weight: 2.5, opacity: 0.95 } : { weight: 1.2, opacity: 0.5 });
-            layers.next.setLatLngs(sky.track(s.id, 0, period, 30, ref).map(toLatLng));
-            layers.past.setLatLngs(selected ? sky.track(s.id, 0, -period / 2, 30, ref).map(toLatLng) : []);
+            drawFaded(layers.next, sky.track(s.id, 0, period, 30, ref).map(toLatLng),
+                { color: s.color, weight: selected ? 2.5 : 1.2 }, selected ? 0.95 : 0.5, 0);
+            // Walks backward from now, so it starts at the satellite and fades toward its oldest point.
+            drawFaded(layers.past, selected ? sky.track(s.id, 0, -period / 2, 30, ref).map(toLatLng) : [],
+                { color: s.color, weight: 1.5, dashArray: '3 6' }, 0.45, 0);
         });
     }
 
