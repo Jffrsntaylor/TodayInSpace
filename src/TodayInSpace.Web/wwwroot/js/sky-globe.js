@@ -97,7 +97,8 @@
         globe.htmlElementsData(shown);
     }
 
-    // ---- Orbits: the next full orbit bright, the last half-orbit faint ----
+    // ---- Orbits: the selected satellite's next orbit bright plus its last half-orbit faint;
+    //      every other satellite gets only its next orbit, thin and dim ----
     globe
         .pathsData([])
         .pathPoints('pts')
@@ -108,10 +109,24 @@
         .pathStroke('stroke')
         .pathTransitionDuration(0);
 
-    // Fat (wide) lines can't be transparent, so fades are done by blending toward the background color.
+    // In this globe.gl version pathStroke is the line width in screen pixels, not degrees
+    // (the fat lines are drawn with worldUnits off), so these are pixel widths.
+    var STROKE_SELECTED = 2.5, STROKE_OTHER = 1.2, STROKE_PAST = 1.2;
+
+    // sRGB 0..255 -> linear 0..255. globe.gl hands gradient colors to the GPU as-is, and the renderer
+    // then encodes its output as sRGB, so without this every mid-tone is gamma-encoded twice and the
+    // orange/cyan orbits come out washed-out, almost white. Pure 0 and 255 are unchanged either way.
+    function toLinear(v) {
+        var c = v / 255;
+        c = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        return Math.round(c * 255);
+    }
+
+    // Fades are done by blending toward the page background (in sRGB, as the eye sees it), then
+    // converting to linear for the GPU.
     function shade(hex, t) {
         var n = parseInt(hex.slice(1), 16), bg = [11, 16, 32];
-        var c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(function (v, i) { return Math.round(bg[i] + (v - bg[i]) * t); });
+        var c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(function (v, i) { return toLinear(bg[i] + (v - bg[i]) * t); });
         return 'rgb(' + c.join(',') + ')';
     }
 
@@ -120,19 +135,28 @@
         sky.SATS.forEach(function (s) {
             if (!sky.hasSat(s.id)) return;
             var period = sky.periodMinutes(s.id);
-            var selected = s.id === sky.state.selected;
-            // Next full orbit: bright at the satellite, fading toward the end.
-            paths.push({
-                pts: sky.track(s.id, 0, period, 20),
-                color: [shade(s.color, selected ? 1 : 0.7), shade(s.color, 0.15)],
-                stroke: selected ? 0.3 : 0.18
-            });
-            // Last half orbit: faint.
-            paths.push({
-                pts: sky.track(s.id, -period / 2, 0, 20),
-                color: [shade(s.color, 0.05), shade(s.color, selected ? 0.45 : 0.3)],
-                stroke: 0.12
-            });
+            if (s.id === sky.state.selected) {
+                // Next full orbit: bright at the satellite, fading toward the end.
+                paths.push({
+                    pts: sky.track(s.id, 0, period, 20),
+                    color: [shade(s.color, 1), shade(s.color, 0.35)],
+                    stroke: STROKE_SELECTED
+                });
+                // Last half orbit: faint, brightening as it reaches the satellite.
+                paths.push({
+                    pts: sky.track(s.id, -period / 2, 0, 20),
+                    color: [shade(s.color, 0.08), shade(s.color, 0.5)],
+                    stroke: STROKE_PAST
+                });
+            } else {
+                // Other satellites: next orbit only, dim but still in their own color. No past track,
+                // so at most 4 lines are on the globe and the bright one always belongs to the selection.
+                paths.push({
+                    pts: sky.track(s.id, 0, period, 20),
+                    color: [shade(s.color, 0.6), shade(s.color, 0.2)],
+                    stroke: STROKE_OTHER
+                });
+            }
         });
         globe.pathsData(paths);
     }
