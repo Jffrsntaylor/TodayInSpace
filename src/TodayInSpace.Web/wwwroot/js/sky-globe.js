@@ -123,7 +123,8 @@
     }
 
     // Fades are done by blending toward the page background (in sRGB, as the eye sees it), then
-    // converting to linear for the GPU.
+    // converting to linear for the GPU. Gradient path colors can't carry alpha in globe.gl
+    // (fat lines drop it), so fading to the background is how a line ends without a hard edge.
     function shade(hex, t) {
         var n = parseInt(hex.slice(1), 16), bg = [11, 16, 32];
         var c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(function (v, i) { return toLinear(bg[i] + (v - bg[i]) * t); });
@@ -136,16 +137,17 @@
             if (!sky.hasSat(s.id)) return;
             var period = sky.periodMinutes(s.id);
             if (s.id === sky.state.selected) {
-                // Next full orbit: bright at the satellite, fading toward the end.
+                // Next full orbit: bright at the satellite, fading all the way into the background so
+                // the far end (where Earth has turned ~23° under it) doesn't look like a line stopping mid-continent.
                 paths.push({
                     pts: sky.track(s.id, 0, period, 20),
-                    color: [shade(s.color, 1), shade(s.color, 0.35)],
+                    color: [shade(s.color, 1), shade(s.color, 0)],
                     stroke: STROKE_SELECTED
                 });
-                // Last half orbit: faint, brightening as it reaches the satellite.
+                // Last half orbit: invisible at its oldest point, brightening as it reaches the satellite.
                 paths.push({
                     pts: sky.track(s.id, -period / 2, 0, 20),
-                    color: [shade(s.color, 0.08), shade(s.color, 0.5)],
+                    color: [shade(s.color, 0), shade(s.color, 0.5)],
                     stroke: STROKE_PAST
                 });
             } else {
@@ -153,7 +155,7 @@
                 // so at most 4 lines are on the globe and the bright one always belongs to the selection.
                 paths.push({
                     pts: sky.track(s.id, 0, period, 20),
-                    color: [shade(s.color, 0.6), shade(s.color, 0.2)],
+                    color: [shade(s.color, 0.6), shade(s.color, 0)],
                     stroke: STROKE_OTHER
                 });
             }
