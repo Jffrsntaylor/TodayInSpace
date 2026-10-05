@@ -15,7 +15,7 @@ namespace TodayInSpace.Web.Controllers
             _sky = sky;
         }
 
-        // GET /api/sky/tle/iss, /api/sky/tle/hubble
+        // GET /api/sky/tle/iss, /api/sky/tle/hubble, /api/sky/tle/tiangong
         [HttpGet("tle/{id}")]
         public async Task<IActionResult> GetTle(string id)
         {

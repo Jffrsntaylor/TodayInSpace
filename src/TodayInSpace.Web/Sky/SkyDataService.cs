@@ -16,6 +16,7 @@ namespace TodayInSpace.Web.Sky
         {
             ["iss"] = 25544,     // International Space Station
             ["hubble"] = 20580,  // Hubble Space Telescope
+            ["tiangong"] = 48274, // Tiangong space station (Tianhe core module)
         };
 
         // Only points with at least this aurora probability (%) are sent to the browser.

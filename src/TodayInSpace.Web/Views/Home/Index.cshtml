@@ -170,14 +170,15 @@
                 </div>
             </div>
             <div class="sky-panel">
-                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" aria-label="3D globe showing the International Space Station and the Hubble Space Telescope, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
-                <div id="sky-map" class="sky-map" hidden aria-label="World map showing the International Space Station and the Hubble Space Telescope, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
+                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" aria-label="3D globe showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
+                <div id="sky-map" class="sky-map" hidden aria-label="World map showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
                 <div class="sky-readout">
                     <div class="sat-title">
                         <strong id="sat-name">International Space Station</strong>
                         <div class="sat-pick" role="group" aria-label="Choose a satellite">
                             <button type="button" class="chip" data-sat="iss" aria-pressed="true">ISS</button>
                             <button type="button" class="chip" data-sat="hubble" aria-pressed="false">Hubble</button>
+                            <button type="button" class="chip" data-sat="tiangong" aria-pressed="false">Tiangong</button>
                             <button type="button" class="chip" id="sat-follow" aria-pressed="false">Follow</button>
                         </div>
                     </div>
@@ -189,6 +190,7 @@
                 <div class="sky-legend">
                     <span><span class="line"></span>ISS orbit</span>
                     <span><span class="line" style="border-color:#ffc46b"></span>Hubble orbit</span>
+                    <span><span class="line" style="border-color:#5fd3e6"></span>Tiangong orbit</span>
                     <span><span class="sw" style="background:#35d49a"></span>Aurora 5&ndash;15%</span>
                     <span><span class="sw" style="background:#7dffb3"></span>15&ndash;30%</span>
                     <span><span class="sw" style="background:#ffd166"></span>30&ndash;50%</span>
@@ -198,7 +200,7 @@
                     <span class="status" id="sky-status" role="status"></span>
                 </div>
             </div>
-            <p class="sky-note">Positions are calculated live in your browser from each satellite&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble.</p>
+            <p class="sky-note">Positions of the ISS, Hubble and Tiangong are calculated live in your browser from each one&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble.</p>
         </section>
 
         <footer class="foot">

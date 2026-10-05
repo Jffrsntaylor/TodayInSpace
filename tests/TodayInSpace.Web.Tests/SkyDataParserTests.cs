@@ -45,12 +45,15 @@ namespace TodayInSpace.Web.Tests
         }
 
         [Fact]
-        public void TrackedSatellites_AreIssAndHubble()
+        public void TrackedSatellites_AreIssHubbleAndTiangong()
         {
             Assert.Equal(25544, SkyDataService.Satellites["iss"]);
             Assert.Equal(20580, SkyDataService.Satellites["hubble"]);
+            Assert.Equal(48274, SkyDataService.Satellites["tiangong"]);
+            Assert.Equal(3, SkyDataService.Satellites.Count);
             Assert.True(SkyDataService.Satellites.ContainsKey("ISS"));       // case-insensitive ids
             Assert.False(SkyDataService.Satellites.ContainsKey("25544"));    // raw catalog numbers aren't accepted
+            Assert.False(SkyDataService.Satellites.ContainsKey("48274"));
         }
 
         // ---------- OVATION aurora ----------
