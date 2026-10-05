@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TodayInSpace.Web.Health;
+using TodayInSpace.Web.Security;
 using TodayInSpace.Web.Services;
 using TodayInSpace.Web.Sky;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Don't advertise the web server in every response. (IIS on Azure may still add its own.)
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<DigestService>();
@@ -34,6 +38,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+// Before routing and static assets, so every response carries the headers.
+app.UseSecurityHeaders();
 
 app.UseHttpsRedirection();
 app.UseRouting();
