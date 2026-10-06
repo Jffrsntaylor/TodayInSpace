@@ -155,6 +155,16 @@
             }
         }
 
+        @* Filled in by sky-core.js from /api/sky/people. Stays hidden if the feed is unavailable. *@
+        <section id="people" class="people" hidden>
+            <div class="section-label">People in Space</div>
+            <div class="card calm">
+                <div class="value" id="people-count">&mdash;</div>
+                <div class="sub">people in space right now</div>
+                <div class="source">Source: The Space Devs</div>
+            </div>
+        </section>
+
         @* sky-loader.js reads these to load the globe and map libraries only when they're needed. *@
         <section class="sky"
                  data-globe-lib="@Url.Content("~/lib/globe.gl/globe.gl.min.js")"

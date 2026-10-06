@@ -1,7 +1,12 @@
 using Microsoft.Extensions.Caching.Memory;
+using TodayInSpace.Core;
 
 namespace TodayInSpace.Web.Sky
 {
+    // Headcount for the "people in space right now" card. A later version can add the list of people
+    // as a new property without changing these.
+    public record PeopleInSpace(int Count, DateTimeOffset Updated, string Source);
+
     // Fetches the Live Sky feeds server-side and caches them, so visitors' browsers never hit
     // CelesTrak or NOAA directly (no rate limits, no CORS issues, one upstream call per cache window).
     // If an upstream call fails, the last good value is served for up to a few days.
@@ -9,6 +14,9 @@ namespace TodayInSpace.Web.Sky
     {
         private const string TleUrlFormat = "https://celestrak.org/NORAD/elements/gp.php?CATNR={0}&FORMAT=TLE";
         private const string OvationUrl = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
+        // Production LL2 only. The free tier allows about 15 requests an hour, hence the long cache below.
+        private const string PeopleUrl = "https://ll.thespacedevs.com/2.3.0/astronauts/?in_space=true&limit=100";
+        public const string PeopleSource = "The Space Devs";
 
         // Satellites the site tracks, by URL-friendly id -> NORAD catalog number.
         // Only these ids are accepted, so the endpoint can't be used to query arbitrary objects.
@@ -24,7 +32,10 @@ namespace TodayInSpace.Web.Sky
 
         private static readonly TimeSpan TleTtl = TimeSpan.FromHours(6);        // CelesTrak asks clients not to poll more often than every couple of hours
         private static readonly TimeSpan AuroraTtl = TimeSpan.FromMinutes(10);  // OVATION updates roughly every 5-10 minutes
+        private static readonly TimeSpan PeopleTtl = TimeSpan.FromHours(6);     // crews change every few weeks or months
         private static readonly TimeSpan StaleTtl = TimeSpan.FromDays(3);
+        // LL2's limit is tight enough that retrying on every page view would keep us throttled.
+        private static readonly TimeSpan PeopleRetryAfterFailure = TimeSpan.FromMinutes(15);
 
         // One refresh at a time per process so a burst of visitors triggers a single upstream call.
         private static readonly SemaphoreSlim RefreshLock = new(1, 1);
@@ -55,10 +66,21 @@ namespace TodayInSpace.Web.Sky
             GetCachedAsync("sky:aurora", AuroraTtl,
                 async () => SkyDataParser.ParseOvation(await _http.GetStringAsync(OvationUrl), AuroraMinProbability));
 
-        private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch) where T : class
+        public Task<PeopleInSpace?> GetPeopleAsync() =>
+            GetCachedAsync("sky:people", PeopleTtl, async () =>
+            {
+                int? count = PeopleInSpaceParser.ParseCount(await _http.GetStringAsync(PeopleUrl));
+                return count is int n ? new PeopleInSpace(n, DateTimeOffset.UtcNow, PeopleSource) : null;
+            }, PeopleRetryAfterFailure);
+
+        // retryAfterFailure: if set, a failed fetch isn't retried until that much time has passed.
+        private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch,
+            TimeSpan? retryAfterFailure = null) where T : class
         {
             if (_cache.TryGetValue(key, out T? fresh) && fresh != null)
                 return fresh;
+            if (_cache.TryGetValue(key + ":cooldown", out _))
+                return Stale<T>(key);
 
             await RefreshLock.WaitAsync();
             try
@@ -85,7 +107,12 @@ namespace TodayInSpace.Web.Sky
                 RefreshLock.Release();
             }
 
-            return _cache.TryGetValue(key + ":stale", out T? stale) ? stale : null;
+            if (retryAfterFailure is TimeSpan cooldown)
+                _cache.Set(key + ":cooldown", true, cooldown);
+            return Stale<T>(key);
         }
+
+        private T? Stale<T>(string key) where T : class =>
+            _cache.TryGetValue(key + ":stale", out T? stale) ? stale : null;
     }
 }
