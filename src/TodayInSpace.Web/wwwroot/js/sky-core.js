@@ -121,6 +121,14 @@ window.TISSky = (function () {
     var $ = function (id) { return document.getElementById(id); };
     var fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
+    // Headcount card. It stays hidden unless a real number arrives.
+    getJson('/api/sky/people').then(function (data) {
+        var section = $('people');
+        if (!section || !data || typeof data.count !== 'number') return;
+        $('people-count').textContent = fmt.format(data.count);
+        section.hidden = false;
+    }).catch(function () { /* no data and no cached copy: keep the card hidden */ });
+
     function satById(id) { return SATS.filter(function (s) { return s.id === id; })[0]; }
 
     function updateReadout() {

@@ -193,6 +193,10 @@ a { color: var(--accent); }
 .card .value.text { font-size: 26px; }
 .card .sub { margin-top: 8px; font-size: 13px; font-style: italic; opacity: 0.85; }
 
+/* ---- People in space ---- */
+.people .card { max-width: 320px; animation: rise .6s ease .2s both; }
+.card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }
+
 /* ---- Kp forecast bars ---- */
 .forecast { margin-top: 30px; animation: rise .6s ease .3s both; }
 .forecast .section-label { margin-top: 0; }

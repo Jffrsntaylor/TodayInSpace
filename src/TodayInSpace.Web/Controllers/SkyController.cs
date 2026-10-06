@@ -41,5 +41,17 @@ namespace TodayInSpace.Web.Controllers
             Response.Headers.CacheControl = "public, max-age=300";
             return Ok(aurora);
         }
+
+        // GET /api/sky/people
+        [HttpGet("people")]
+        public async Task<IActionResult> GetPeople()
+        {
+            var people = await _sky.GetPeopleAsync();
+            if (people == null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            Response.Headers.CacheControl = "public, max-age=3600";
+            return Ok(people);
+        }
     }
 }
