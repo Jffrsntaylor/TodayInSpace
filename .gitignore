@@ -367,4 +367,5 @@ local.settings.json
 # Claude Code: personal settings and task briefs (shared settings + skills are committed)
 .claude/settings.local.json
 .claude/briefs/
+.claude/launch.json
 CLAUDE.local.md
