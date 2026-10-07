@@ -1,11 +1,22 @@
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
 using TodayInSpace.Core;
 
 namespace TodayInSpace.Web.Sky
 {
-    // Headcount for the "people in space right now" card. A later version can add the list of people
-    // as a new property without changing these.
-    public record PeopleInSpace(int Count, DateTimeOffset Updated, string Source);
+    // Everyone in space right now, for the "People in Space" section. A fixed shape built from the
+    // parsed feeds, so upstream JSON is never passed through to the browser.
+    public record PeopleInSpace(int Count, DateTimeOffset Updated, string Source, IReadOnlyList<PersonDto> People)
+    {
+        // True when the expeditions feed failed and everyone is filed under "In orbit". Only used to
+        // pick a shorter cache time; not sent to the browser.
+        [JsonIgnore]
+        public bool StationsMissing { get; init; }
+    }
+
+    public record PersonDto(string Name, string? Agency, IReadOnlyList<FlagDto> Flags, string Station);
+
+    public record FlagDto(string Code, string Country);
 
     // Fetches the Live Sky feeds server-side and caches them, so visitors' browsers never hit
     // CelesTrak or NOAA directly (no rate limits, no CORS issues, one upstream call per cache window).
@@ -16,6 +27,8 @@ namespace TodayInSpace.Web.Sky
         private const string OvationUrl = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
         // Production LL2 only. The free tier allows about 15 requests an hour, hence the long cache below.
         private const string PeopleUrl = "https://ll.thespacedevs.com/2.3.0/astronauts/?in_space=true&limit=100";
+        // Only used to label which station each person is on.
+        private const string ExpeditionsUrl = "https://ll.thespacedevs.com/2.3.0/expeditions/?is_active=true&mode=detailed";
         public const string PeopleSource = "The Space Devs";
 
         // Satellites the site tracks, by URL-friendly id -> NORAD catalog number.
@@ -66,16 +79,49 @@ namespace TodayInSpace.Web.Sky
             GetCachedAsync("sky:aurora", AuroraTtl,
                 async () => SkyDataParser.ParseOvation(await _http.GetStringAsync(OvationUrl), AuroraMinProbability));
 
+        // Both LL2 feeds are fetched together and cached as one entry, so that's two upstream calls per
+        // cache window. The astronaut list decides who and how many; the expeditions only add station
+        // labels, so if that call fails everyone is still shown, under "In orbit".
         public Task<PeopleInSpace?> GetPeopleAsync() =>
             GetCachedAsync("sky:people", PeopleTtl, async () =>
             {
-                int? count = PeopleInSpaceParser.ParseCount(await _http.GetStringAsync(PeopleUrl));
-                return count is int n ? new PeopleInSpace(n, DateTimeOffset.UtcNow, PeopleSource) : null;
-            }, PeopleRetryAfterFailure);
+                var astronauts = PeopleInSpaceParser.ParsePeople(await _http.GetStringAsync(PeopleUrl));
+                if (astronauts == null)
+                    return null;
+
+                IReadOnlyDictionary<int, string>? stations = null;
+                try
+                {
+                    stations = ExpeditionParser.ParseStations(await _http.GetStringAsync(ExpeditionsUrl));
+                    if (stations == null)
+                        _logger.LogWarning("Expeditions feed returned data in an unexpected format.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Expeditions feed fetch failed: {msg}", ex.Message);
+                }
+
+                var people = PeopleInSpaceMerge.Group(astronauts, stations)
+                    .Select(p => new PersonDto(
+                        p.Person.Name,
+                        p.Agency,
+                        p.Person.Nationalities.Select(n => new FlagDto(n.Code, n.Country)).ToList(),
+                        p.Station))
+                    .ToList();
+                return new PeopleInSpace(astronauts.Count, DateTimeOffset.UtcNow, PeopleSource, people)
+                {
+                    StationsMissing = stations == null,
+                };
+            },
+            PeopleRetryAfterFailure,
+            // Without station labels, try again after the cooldown rather than showing everyone
+            // "In orbit" for the full six hours.
+            ttlFor: p => p.StationsMissing ? PeopleRetryAfterFailure : PeopleTtl);
 
         // retryAfterFailure: if set, a failed fetch isn't retried until that much time has passed.
+        // ttlFor: if set, picks the cache time from the fetched value instead of using ttl.
         private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch,
-            TimeSpan? retryAfterFailure = null) where T : class
+            TimeSpan? retryAfterFailure = null, Func<T, TimeSpan>? ttlFor = null) where T : class
         {
             if (_cache.TryGetValue(key, out T? fresh) && fresh != null)
                 return fresh;
@@ -92,7 +138,7 @@ namespace TodayInSpace.Web.Sky
                 var value = await fetch();
                 if (value != null)
                 {
-                    _cache.Set(key, value, ttl);
+                    _cache.Set(key, value, ttlFor?.Invoke(value) ?? ttl);
                     _cache.Set(key + ":stale", value, StaleTtl);
                     return value;
                 }

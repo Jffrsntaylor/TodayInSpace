@@ -195,6 +195,45 @@ a { color: var(--accent); }
 
 /* ---- People in space ---- */
 .people .card { max-width: 320px; animation: rise .6s ease .2s both; }
+/* With the list of people: number on the left, station groups on the right. */
+.people.has-list .card {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) 1fr;
+    gap: 8px 28px;
+    align-items: center;
+}
+.people.has-list .card:hover { transform: none; }
+.people.has-list .source { grid-column: 1 / -1; }
+.people-groups { text-align: left; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.people-station {
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+}
+.people-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.person {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    min-width: 0;
+}
+.person .flags { display: flex; gap: 4px; flex: none; }
+.person .flag { display: block; border-radius: 2px; }
+.person-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.person-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.person-agency { font-size: 11px; color: var(--ink-faint); }
+@media (max-width: 640px) {
+    .people.has-list .card { grid-template-columns: 1fr; padding: 20px 14px; }
+}
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }
 
 /* ---- Kp forecast bars ---- */

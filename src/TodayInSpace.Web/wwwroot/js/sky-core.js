@@ -121,13 +121,68 @@ window.TISSky = (function () {
     var $ = function (id) { return document.getElementById(id); };
     var fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
-    // Headcount card. It stays hidden unless a real number arrives.
+    // People in Space. The section stays hidden unless a real number arrives; if the list of
+    // people is missing, just the number is shown.
     getJson('/api/sky/people').then(function (data) {
         var section = $('people');
         if (!section || !data || typeof data.count !== 'number') return;
         $('people-count').textContent = fmt.format(data.count);
+        if (Array.isArray(data.people) && data.people.length) showPeople(data.people);
         section.hidden = false;
     }).catch(function () { /* no data and no cached copy: keep the card hidden */ });
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+    }
+
+    function flagImg(flag) {
+        if (!flag || !/^[A-Z]{2}$/.test(flag.code)) return null;
+        var img = el('img', 'flag');
+        img.src = '/lib/flag-icons/4x3/' + flag.code.toLowerCase() + '.svg';
+        img.width = 20;
+        img.height = 15;
+        img.alt = flag.country || flag.code;
+        img.loading = 'lazy';
+        // No flag for this code: drop the image and let the name stand on its own.
+        img.addEventListener('error', function () { img.remove(); });
+        return img;
+    }
+
+    // The server already sorts people by station group, then name, so groups appear in order.
+    function showPeople(people) {
+        var box = $('people-groups');
+        if (!box) return;
+        var groups = [];
+        people.forEach(function (p) {
+            var last = groups[groups.length - 1];
+            if (!last || last.station !== p.station) groups.push(last = { station: p.station, people: [] });
+            last.people.push(p);
+        });
+
+        groups.forEach(function (g) {
+            var group = el('div', 'people-group');
+            group.appendChild(el('h3', 'people-station', g.station + ' · ' + g.people.length));
+            var chips = el('ul', 'people-chips');
+            g.people.forEach(function (p) {
+                var chip = el('li', 'person');
+                var flags = el('span', 'flags');
+                (p.flags || []).forEach(function (f) { var img = flagImg(f); if (img) flags.appendChild(img); });
+                if (flags.childNodes.length) chip.appendChild(flags);
+                var text = el('span', 'person-text');
+                text.appendChild(el('span', 'person-name', p.name));
+                if (p.agency) text.appendChild(el('span', 'person-agency', p.agency));
+                chip.appendChild(text);
+                chips.appendChild(chip);
+            });
+            group.appendChild(chips);
+            box.appendChild(group);
+        });
+        box.hidden = false;
+        $('people').classList.add('has-list');
+    }
 
     function satById(id) { return SATS.filter(function (s) { return s.id === id; })[0]; }
 
