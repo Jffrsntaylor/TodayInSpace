@@ -57,5 +57,14 @@ namespace TodayInSpace.Web.Tests
         {
             Assert.Equal(((string?)null, (string?)null), ArchiveNav.GetNeighbors(date, Today));
         }
+
+        [Theory]
+        [InlineData(2026, 10, 1, "2026-09-30")] // normal day
+        [InlineData(2026, 1, 1, "2025-12-31")]  // back into the previous year
+        [InlineData(2024, 3, 1, "2024-02-29")]  // back onto a leap day
+        public void DefaultDate_IsYesterday(int year, int month, int day, string expected)
+        {
+            Assert.Equal(expected, ArchiveNav.DefaultDate(new DateOnly(year, month, day)));
+        }
     }
 }
