@@ -23,5 +23,12 @@ namespace TodayInSpace.Core
 
             return (prev, next);
         }
+
+        // The day the archive opens on when no date is given: yesterday, since today's
+        // digest is already on the homepage. Same UTC "today" as GetNeighbors and the picker's max.
+        public static string DefaultDate(DateOnly todayUtc)
+        {
+            return todayUtc.AddDays(-1).ToString(DateFormat, CultureInfo.InvariantCulture);
+        }
     }
 }

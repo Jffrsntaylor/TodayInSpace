@@ -22,25 +22,27 @@ namespace TodayInSpace.Web.Controllers
             return View(digest);
         }
 
-        // Archive: shows a date picker. If a date is provided (?date=2026-06-02),
-        // it loads that day's digest; otherwise it just shows the picker.
+        // Archive: shows a date picker and the digest for ?date=2026-06-02.
         public async Task<IActionResult> Archive(string? date)
         {
+            var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            if (string.IsNullOrWhiteSpace(date))
+            {
+                // No date: send people to yesterday so the normal date path fills in the picker
+                // and arrows, and the URL can be bookmarked. Not a 301, because browsers cache
+                // those and "yesterday" changes every day.
+                return Redirect($"/Home/Archive?date={ArchiveNav.DefaultDate(todayUtc)}");
+            }
+
             // Pass the selected date back to the view so the picker stays on it.
             ViewBag.SelectedDate = date;
 
             // Previous/next day links. Set before the lookup so they still show on
             // "No forecast found", letting people step past a missing day.
-            var (prevDate, nextDate) = ArchiveNav.GetNeighbors(date, DateOnly.FromDateTime(DateTime.UtcNow));
+            var (prevDate, nextDate) = ArchiveNav.GetNeighbors(date, todayUtc);
             ViewBag.PrevDate = prevDate;
             ViewBag.NextDate = nextDate;
-
-            if (string.IsNullOrWhiteSpace(date))
-            {
-                // No date chosen yet — show the picker with no digest loaded.
-                ViewBag.NoDateChosen = true;
-                return View(null);
-            }
 
             var digest = await _digestService.GetByDateAsync(date);
 
