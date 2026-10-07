@@ -15,6 +15,8 @@ builder.Services.AddScoped<DigestService>();
 
 // Live Sky map feeds (ISS orbit data + NOAA aurora forecast), fetched server-side and cached.
 builder.Services.AddMemoryCache();
+// People in space comes from storage; the function app fetches it from LL2 on a timer.
+builder.Services.AddSingleton<IPeopleStore, BlobPeopleStore>();
 builder.Services.AddHttpClient<SkyDataService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);

@@ -1,79 +1,90 @@
-using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using TodayInSpace.Core;
 using TodayInSpace.Web.Sky;
 
 namespace TodayInSpace.Web.Tests
 {
     public class PeopleInSpaceServiceTests
     {
-        private const string Astronauts = @"{""results"": [
-            {""id"": 573, ""name"": ""Jessica Meir"", ""type"": {""name"": ""Government""}, ""agency"": {""abbrev"": ""NASA""},
-             ""nationality"": [{""name"": ""United States of America"", ""alpha_2_code"": ""US""}]},
-            {""id"": 710, ""name"": ""Luke Delaney"", ""type"": {""name"": ""Government""}, ""agency"": {""abbrev"": ""NASA""},
-             ""nationality"": [{""name"": ""United States of America"", ""alpha_2_code"": ""US""}]},
-            {""id"": 638, ""name"": ""Starman"", ""type"": {""name"": ""Non-Human""}, ""nationality"": []}
+        // What the function writes to sky/people.json.
+        private const string Stored = @"{""count"":2,""updated"":""2026-10-07T12:15:00+00:00"",""source"":""The Space Devs"",""people"":[
+            {""name"":""Jessica Meir"",""agency"":""NASA"",""flags"":[{""code"":""US"",""country"":""United States of America""}],""station"":""ISS""},
+            {""name"":""Luke Delaney"",""agency"":""NASA"",""flags"":[{""code"":""US"",""country"":""United States of America""}],""station"":""In orbit""}
         ]}";
 
-        private const string Expeditions = @"{""results"": [
-            {""start"": ""2026-07-26T07:02:00Z"", ""spacestation"": {""name"": ""International Space Station""},
-             ""crew"": [{""id"": 5279, ""astronaut"": {""id"": 573}}]}
-        ]}";
-
-        // Answers LL2 URLs from canned responses and counts how many requests went upstream.
-        private class FakeLl2 : HttpMessageHandler
+        // Returns canned blob contents and counts reads.
+        private class FakeStore : IPeopleStore
         {
-            public bool ExpeditionsFail { get; init; }
-            public int Calls { get; private set; }
+            public string? Json { get; init; }
+            public int Reads { get; private set; }
 
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+            public Task<string?> ReadAsync()
             {
-                Calls++;
-                string path = request.RequestUri!.AbsolutePath;
-                var response = path.Contains("/astronauts/") ? Ok(Astronauts)
-                    : path.Contains("/expeditions/") && !ExpeditionsFail ? Ok(Expeditions)
-                    : new HttpResponseMessage(HttpStatusCode.TooManyRequests);
-                return Task.FromResult(response);
+                Reads++;
+                return Task.FromResult(Json);
             }
-
-            private static HttpResponseMessage Ok(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body) };
         }
 
-        private static SkyDataService Service(FakeLl2 handler) =>
-            new(new HttpClient(handler), new MemoryCache(new MemoryCacheOptions()), NullLogger<SkyDataService>.Instance);
+        // Fails the test if anything tries to go upstream: the web app must not call LL2.
+        private class NoNetwork : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+                throw new InvalidOperationException("Unexpected HTTP call to " + request.RequestUri);
+        }
+
+        private static SkyDataService Service(FakeStore store) =>
+            new(new HttpClient(new NoNetwork()), store, new MemoryCache(new MemoryCacheOptions()), NullLogger<SkyDataService>.Instance);
 
         [Fact]
-        public async Task GetPeople_JoinsStations_AndUnmatchedPeopleAreInOrbit()
+        public async Task GetPeople_ReadsStoredSnapshot_WithoutCallingLl2()
         {
-            var people = (await Service(new FakeLl2()).GetPeopleAsync())!;
+            var people = (await Service(new FakeStore { Json = Stored }).GetPeopleAsync())!;
 
             Assert.Equal(2, people.Count);
+            Assert.Equal(new DateTimeOffset(2026, 10, 7, 12, 15, 0, TimeSpan.Zero), people.Updated);
             Assert.Equal("ISS", people.People.Single(p => p.Name == "Jessica Meir").Station);
             Assert.Equal("In orbit", people.People.Single(p => p.Name == "Luke Delaney").Station);
-            Assert.False(people.StationsMissing);
         }
 
         [Fact]
-        public async Task GetPeople_ExpeditionsFail_EveryoneInOrbit_CountUnchanged()
+        public async Task GetPeople_ServesTheShapeTheFrontEndUses()
         {
-            var people = (await Service(new FakeLl2 { ExpeditionsFail = true }).GetPeopleAsync())!;
+            var people = await Service(new FakeStore { Json = Stored }).GetPeopleAsync();
 
-            Assert.Equal(2, people.Count);
-            Assert.Equal(2, people.People.Count);
-            Assert.All(people.People, p => Assert.Equal("In orbit", p.Station));
-            Assert.True(people.StationsMissing);
+            // Same options the controller's Ok() uses.
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(people, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            var root = doc.RootElement;
+            Assert.Equal(2, root.GetProperty("count").GetInt32());
+            Assert.Equal(PeopleInSpaceSnapshot.Source, root.GetProperty("source").GetString());
+            Assert.True(root.TryGetProperty("updated", out _));
+            var first = root.GetProperty("people")[0];
+            Assert.Equal("Jessica Meir", first.GetProperty("name").GetString());
+            Assert.Equal("NASA", first.GetProperty("agency").GetString());
+            Assert.Equal("ISS", first.GetProperty("station").GetString());
+            Assert.Equal("US", first.GetProperty("flags")[0].GetProperty("code").GetString());
+            Assert.Equal("United States of America", first.GetProperty("flags")[0].GetProperty("country").GetString());
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("not json")]
+        public async Task GetPeople_NoUsableSnapshot_ReturnsNull(string? json)
+        {
+            Assert.Null(await Service(new FakeStore { Json = json }).GetPeopleAsync());
         }
 
         [Fact]
         public async Task GetPeople_SecondCall_IsServedFromCache()
         {
-            var ll2 = new FakeLl2();
-            var service = Service(ll2);
+            var store = new FakeStore { Json = Stored };
+            var service = Service(store);
 
             await service.GetPeopleAsync();
             await service.GetPeopleAsync();
 
-            Assert.Equal(2, ll2.Calls);
+            Assert.Equal(1, store.Reads);
         }
     }
 }
