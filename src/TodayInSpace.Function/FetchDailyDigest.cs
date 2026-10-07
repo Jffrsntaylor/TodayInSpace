@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using TodayInSpace.Core;
@@ -174,7 +175,12 @@ namespace TodayInSpace.Function
                 _logger.LogWarning("Forecast fetch failed: {msg}. Continuing without it.", ex.Message);
             }
 
-            // ---- 5. Build the digest object (matches the website's schema) ----
+            // ---- 5. Who's in space today ----
+            // Copied from the snapshot RefreshPeopleInSpace keeps, never fetched from LL2 here.
+            // Left out if it's missing or old; the digest must never fail because of it.
+            var people = await LoadPeopleAsync(containerClient);
+
+            // ---- 6. Build the digest object (matches the website's schema) ----
             var digest = new DigestModel
             {
                 date = today,
@@ -185,15 +191,13 @@ namespace TodayInSpace.Function
                     auroraChance   = AuroraFromKp(currentKp),
                     solarWindSpeed = solarWindSpeed,
                     forecast       = forecast
-                }
+                },
+                people = people
             };
 
-            string digestJson = JsonSerializer.Serialize(digest, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            string digestJson = Serialize(digest);
 
-            // ---- 6. Write two blobs: today's dated file AND latest.json ----
+            // ---- 7. Write two blobs: today's dated file AND latest.json ----
             try
             {
                 await containerClient.CreateIfNotExistsAsync();
@@ -203,13 +207,43 @@ namespace TodayInSpace.Function
 
                 // One line per run with named properties, so App Insights can chart and alert on it.
                 _logger.LogInformation(
-                    "Digest published {Date} apodSource={ApodSource} imageArchived={ImageArchived} kp={Kp} solarWind={SolarWind}",
-                    today, apodSource, apod?.imageBlob != null, currentKp, solarWindSpeed);
+                    "Digest published {Date} apodSource={ApodSource} imageArchived={ImageArchived} kp={Kp} solarWind={SolarWind} people={People}",
+                    today, apodSource, apod?.imageBlob != null, currentKp, solarWindSpeed, people?.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning("Blob write failed: {msg}", ex.Message);
                 LogNotPublished(today, "blob write failed", apodSource);
+            }
+        }
+
+        // camelCase so the people section is saved as { count, updated, people }. Every other property
+        // is already named in camelCase, so their keys are unchanged (DigestFormatTests checks this).
+        private static readonly JsonSerializerOptions DigestJson = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        public static string Serialize(DigestModel digest) => JsonSerializer.Serialize(digest, DigestJson);
+
+        // The people snapshot for today's digest, or null if it's missing, unreadable or too old.
+        private async Task<DigestPeople?> LoadPeopleAsync(BlobContainerClient containerClient)
+        {
+            try
+            {
+                var blob = containerClient.GetBlobClient(PeopleInSpaceSnapshot.BlobName);
+                if (!await blob.ExistsAsync())
+                    return null;
+                var people = PeopleInSpaceSnapshot.ForDigest((await blob.DownloadContentAsync()).Value.Content.ToString(), DateTimeOffset.UtcNow);
+                if (people == null)
+                    _logger.LogWarning("people.json is unreadable or too old; publishing the digest without people.");
+                return people;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Couldn't read people.json: {msg}. Continuing without it.", ex.Message);
+                return null;
             }
         }
 
@@ -350,7 +384,7 @@ namespace TodayInSpace.Function
                     if (!await blob.ExistsAsync())
                         continue;
 
-                    var previous = JsonSerializer.Deserialize<DigestModel>((await blob.DownloadContentAsync()).Value.Content.ToString());
+                    var previous = JsonSerializer.Deserialize<DigestModel>((await blob.DownloadContentAsync()).Value.Content.ToString(), DigestJson);
                     var apod = previous?.apod;
                     if (apod == null ||
                         !ApodSources.LooksLikeRealApod(apod.title, apod.explanation,
@@ -401,6 +435,10 @@ namespace TodayInSpace.Function
         public string date { get; set; } = "";
         public ApodInfo? apod { get; set; }
         public SpaceWeatherInfo spaceWeather { get; set; } = new();
+        // Who was in space that day. Left out of the JSON entirely when people.json wasn't usable,
+        // so those digests look exactly like the ones from before this existed.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DigestPeople? people { get; set; }
     }
     public class ApodInfo
     {

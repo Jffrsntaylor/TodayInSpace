@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TodayInSpace.Web\TodayInSpace.Web.csproj" />
+    <!-- Only for DigestFormatTests: the digest's saved JSON is written by the function app. -->
+    <ProjectReference Include="..\..\src\TodayInSpace.Function\TodayInSpace.Function.csproj" />
   </ItemGroup>
 
   <ItemGroup>

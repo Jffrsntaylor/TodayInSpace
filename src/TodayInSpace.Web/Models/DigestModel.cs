@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TodayInSpace.Core;
 
 namespace TodayInSpace.Web.Models
 {
@@ -13,6 +14,10 @@ namespace TodayInSpace.Web.Models
 
         [JsonPropertyName("spaceWeather")]
         public SpaceWeatherInfo? SpaceWeather { get; set; }
+
+        // Who was in space that day. Digests from before October 2026 don't have it.
+        [JsonPropertyName("people")]
+        public DigestPeople? People { get; set; }
     }
 
     // Astronomy Picture of the Day section

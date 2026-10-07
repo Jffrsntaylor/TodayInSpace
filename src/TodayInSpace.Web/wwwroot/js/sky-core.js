@@ -121,15 +121,47 @@ window.TISSky = (function () {
     var $ = function (id) { return document.getElementById(id); };
     var fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
-    // People in Space. The section stays hidden unless a real number arrives; if the list of
-    // people is missing, just the number is shown.
+    // The function refreshes every 3 hours, so 12 hours means four runs in a row were missed.
+    var PEOPLE_STALE_HOURS = 12;
+
+    // People in Space. The section stays hidden unless a real number arrives. The number is shown
+    // before the list is built, so a problem with the list can never hide the number too.
     getJson('/api/sky/people').then(function (data) {
         var section = $('people');
         if (!section || !data || typeof data.count !== 'number') return;
         $('people-count').textContent = fmt.format(data.count);
-        if (Array.isArray(data.people) && data.people.length) showPeople(data.people);
         section.hidden = false;
+        showUpdated(data.updated);
+        try {
+            if (Array.isArray(data.people) && data.people.length) showPeople(data.people);
+        } catch (e) {
+            console.error('Couldn’t show the list of people in space', e);
+        }
     }).catch(function () { /* no data and no cached copy: keep the card hidden */ });
+
+    // "just now", "5 minutes ago", "2 hours ago", "3 days ago".
+    function timeAgo(ms) {
+        var minutes = Math.floor(ms / 60000);
+        if (minutes < 5) return 'just now';
+        if (minutes < 60) return minutes + ' minutes ago';
+        var hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+        var days = Math.floor(hours / 24);
+        return days + (days === 1 ? ' day ago' : ' days ago');
+    }
+
+    // Adds when the list was fetched to the card's source line, and says so if it's getting old.
+    // Old data is still shown: being honest about its age beats hiding it.
+    function showUpdated(updated) {
+        var source = $('people-source');
+        var t = new Date(updated);
+        if (!source || !updated || isNaN(t)) return;
+        var age = Math.max(0, Date.now() - t);
+        source.title = 'Updated ' + t.toLocaleString();
+        source.appendChild(document.createTextNode(' · updated ' + timeAgo(age)));
+        if (age > PEOPLE_STALE_HOURS * 3600000)
+            source.appendChild(el('span', 'stale', ' · may be out of date'));
+    }
 
     function el(tag, className, text) {
         var node = document.createElement(tag);
