@@ -35,13 +35,15 @@ namespace TodayInSpace.Web.Sky
         private readonly IPeopleStore _people;
         private readonly IMemoryCache _cache;
         private readonly ILogger<SkyDataService> _logger;
+        private readonly TimeProvider _clock;
 
-        public SkyDataService(HttpClient http, IPeopleStore people, IMemoryCache cache, ILogger<SkyDataService> logger)
+        public SkyDataService(HttpClient http, IPeopleStore people, IMemoryCache cache, ILogger<SkyDataService> logger, TimeProvider clock)
         {
             _http = http;
             _people = people;
             _cache = cache;
             _logger = logger;
+            _clock = clock;
         }
 
         // Returns null for ids we don't track, or if the data can't be fetched and nothing is cached.
@@ -61,10 +63,20 @@ namespace TodayInSpace.Web.Sky
 
         // The RefreshPeopleInSpace function fetches LL2 on a timer and stores the result; this only reads
         // that copy. Calling LL2 from here got the site rate-limited (App Service outbound IPs are shared).
-        // Null until the function has written it once.
-        public Task<PeopleInSpace?> GetPeopleAsync() =>
-            GetCachedAsync("sky:people", PeopleTtl,
+        // Null until the function has written it once, and null again if it stops refreshing for a week.
+        public async Task<PeopleInSpace?> GetPeopleAsync()
+        {
+            var people = await GetCachedAsync("sky:people", PeopleTtl,
                 async () => PeopleInSpaceSnapshot.Parse(await _people.ReadAsync()));
+
+            // Checked after the cache so the stale fallback copy ages out too.
+            if (people != null && PeopleInSpaceSnapshot.IsTooOld(people, _clock.GetUtcNow()))
+            {
+                _logger.LogWarning("people.json is too old to show (updated {Updated}).", people.Updated);
+                return null;
+            }
+            return people;
+        }
 
         private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch) where T : class
         {

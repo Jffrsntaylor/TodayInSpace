@@ -10,6 +10,9 @@ namespace TodayInSpace.Core
 
     public record FlagDto(string Code, string Country);
 
+    // The people section saved in each daily digest, so the archive remembers who was up that day.
+    public record DigestPeople(int Count, DateTimeOffset Updated, IReadOnlyList<PersonDto> People);
+
     // A fresh snapshot, plus where its station labels came from, for the run's log line.
     public record PeopleRefresh(PeopleInSpace Snapshot, string Stations);
 
@@ -26,6 +29,10 @@ namespace TodayInSpace.Core
         public const string StationsFresh = "fresh";        // from today's expeditions feed
         public const string StationsPrevious = "previous";  // expeditions failed; kept the last known labels
         public const string StationsNone = "none";          // expeditions failed and nothing to fall back on
+
+        // The function refreshes every 3 hours, so a week-old list means it has been broken for days,
+        // and crews rotate often enough that showing it would be more wrong than helpful.
+        public static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
 
         // Same casing the browser already gets from ASP.NET Core, so the stored JSON can be served unchanged.
         private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -75,6 +82,19 @@ namespace TodayInSpace.Core
                 if (known.TryGetValue(a.Name, out var station))
                     result[a.Id] = station;
             return result;
+        }
+
+        // "now" is passed in so tests can pin it. A snapshot with no "updated" reads as year 1, so it's too old.
+        public static bool IsTooOld(PeopleInSpace snapshot, DateTimeOffset now) => now - snapshot.Updated > MaxAge;
+
+        // What the daily digest embeds from sky/people.json. Null when it's missing, unreadable or too old,
+        // in which case the digest just goes out without a people section.
+        public static DigestPeople? ForDigest(string? json, DateTimeOffset now)
+        {
+            var snapshot = Parse(json);
+            if (snapshot == null || IsTooOld(snapshot, now))
+                return null;
+            return new DigestPeople(snapshot.Count, snapshot.Updated, snapshot.People);
         }
 
         public static string Serialize(PeopleInSpace snapshot) => JsonSerializer.Serialize(snapshot, Json);

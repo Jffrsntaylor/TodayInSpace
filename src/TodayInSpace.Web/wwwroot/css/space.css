@@ -235,6 +235,7 @@ a { color: var(--accent); }
     .people.has-list .card { grid-template-columns: 1fr; padding: 20px 14px; }
 }
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }
+.card .source .stale { color: var(--watch); }
 
 /* ---- Kp forecast bars ---- */
 .forecast { margin-top: 30px; animation: rise .6s ease .3s both; }

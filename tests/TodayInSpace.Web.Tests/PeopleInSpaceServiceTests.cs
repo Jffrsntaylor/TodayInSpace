@@ -34,8 +34,18 @@ namespace TodayInSpace.Web.Tests
                 throw new InvalidOperationException("Unexpected HTTP call to " + request.RequestUri);
         }
 
-        private static SkyDataService Service(FakeStore store) =>
-            new(new HttpClient(new NoNetwork()), store, new MemoryCache(new MemoryCacheOptions()), NullLogger<SkyDataService>.Instance);
+        // Pins "now" so the age check doesn't depend on when the tests run.
+        private class FixedClock(DateTimeOffset now) : TimeProvider
+        {
+            public override DateTimeOffset GetUtcNow() => now;
+        }
+
+        // An hour after the stored snapshot's "updated".
+        private static readonly DateTimeOffset Now = new(2026, 10, 7, 13, 15, 0, TimeSpan.Zero);
+
+        private static SkyDataService Service(FakeStore store, DateTimeOffset? now = null) =>
+            new(new HttpClient(new NoNetwork()), store, new MemoryCache(new MemoryCacheOptions()),
+                NullLogger<SkyDataService>.Instance, new FixedClock(now ?? Now));
 
         [Fact]
         public async Task GetPeople_ReadsStoredSnapshot_WithoutCallingLl2()
@@ -73,6 +83,21 @@ namespace TodayInSpace.Web.Tests
         public async Task GetPeople_NoUsableSnapshot_ReturnsNull(string? json)
         {
             Assert.Null(await Service(new FakeStore { Json = json }).GetPeopleAsync());
+        }
+
+        [Fact]
+        public async Task GetPeople_ExactlySevenDaysOld_IsStillServed()
+        {
+            var updated = new DateTimeOffset(2026, 10, 7, 12, 15, 0, TimeSpan.Zero);
+            Assert.NotNull(await Service(new FakeStore { Json = Stored }, updated.AddDays(7)).GetPeopleAsync());
+        }
+
+        [Fact]
+        public async Task GetPeople_OlderThanSevenDays_ReturnsNull()
+        {
+            // The controller turns null into a 503, which keeps the section hidden.
+            var updated = new DateTimeOffset(2026, 10, 7, 12, 15, 0, TimeSpan.Zero);
+            Assert.Null(await Service(new FakeStore { Json = Stored }, updated.AddDays(8)).GetPeopleAsync());
         }
 
         [Fact]

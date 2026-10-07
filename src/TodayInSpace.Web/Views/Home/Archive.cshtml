@@ -1,4 +1,5 @@
 @model TodayInSpace.Web.Models.DigestModel
+@inject FlagIcons Flags
 @{
     ViewData["Title"] = "Forecast Archive";
     ViewData["OgTitle"] = "Archive — Today in Space";
@@ -160,6 +161,57 @@
                             <div class="value">@(sw.SolarWindSpeed?.ToString() ?? "—")</div>
                             <div class="sub">km/s</div>
                         </div>
+                    </div>
+                </section>
+            }
+
+            @* Saved in the digest since October 2026; older days have no people section, so no card. *@
+            @if (Model.People is { People.Count: > 0 } people)
+            {
+                <section class="people has-list">
+                    <div class="section-label">People in Space</div>
+                    <div class="card calm people-card">
+                        <div class="people-total">
+                            <div class="value">@people.Count</div>
+                            <div class="sub">people in space that day</div>
+                        </div>
+                        <div class="people-groups">
+                            @* The function stores people sorted by station, so GroupBy keeps that order. *@
+                            @foreach (var group in people.People.GroupBy(p => p.Station))
+                            {
+                                <div class="people-group">
+                                    <h3 class="people-station">@group.Key &middot; @group.Count()</h3>
+                                    <ul class="people-chips">
+                                        @foreach (var person in group)
+                                        {
+                                            var flags = (person.Flags ?? [])
+                                                .Select(f => (Src: Flags.Src(f.Code), Alt: string.IsNullOrEmpty(f.Country) ? f.Code : f.Country))
+                                                .Where(f => f.Src != null)
+                                                .ToList();
+                                            <li class="person">
+                                                @if (flags.Count > 0)
+                                                {
+                                                    <span class="flags">
+                                                        @foreach (var flag in flags)
+                                                        {
+                                                            <img class="flag" src="@flag.Src" width="20" height="15" alt="@flag.Alt" loading="lazy" />
+                                                        }
+                                                    </span>
+                                                }
+                                                <span class="person-text">
+                                                    <span class="person-name">@person.Name</span>
+                                                    @if (!string.IsNullOrEmpty(person.Agency))
+                                                    {
+                                                        <span class="person-agency">@person.Agency</span>
+                                                    }
+                                                </span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                        <div class="source">Source: The Space Devs</div>
                     </div>
                 </section>
             }

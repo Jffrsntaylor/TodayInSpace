@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TodayInSpace.Web.Health;
+using TodayInSpace.Web.Helpers;
 using TodayInSpace.Web.Security;
 using TodayInSpace.Web.Services;
 using TodayInSpace.Web.Sky;
@@ -17,6 +18,8 @@ builder.Services.AddScoped<DigestService>();
 builder.Services.AddMemoryCache();
 // People in space comes from storage; the function app fetches it from LL2 on a timer.
 builder.Services.AddSingleton<IPeopleStore, BlobPeopleStore>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<FlagIcons>();
 builder.Services.AddHttpClient<SkyDataService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
