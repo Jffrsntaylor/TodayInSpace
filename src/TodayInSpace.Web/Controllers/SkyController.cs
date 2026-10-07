@@ -50,7 +50,8 @@ namespace TodayInSpace.Web.Controllers
             if (people == null)
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
 
-            Response.Headers.CacheControl = "public, max-age=3600";
+            // Short, so browsers and home-screen installs pick up the 3-hourly refresh.
+            Response.Headers.CacheControl = "public, max-age=600";
             return Ok(people);
         }
     }
