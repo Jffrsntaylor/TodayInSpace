@@ -33,6 +33,13 @@ jobs:
       - name: Build Bicep
         run: az bicep build --file infra/main.bicep
 
+      # The param file reads NASA_API_KEY and fails to compile without it. A placeholder is enough for a
+      # compile check; nothing here is deployed.
+      - name: Build company Bicep params
+        run: az bicep build-params --file infra/company.bicepparam --stdout > /dev/null
+        env:
+          NASA_API_KEY: compile-check-placeholder
+
       - name: Publish web app
         run: dotnet publish src/TodayInSpace.Web/TodayInSpace.Web.csproj -c Release -o out/web --no-build
 
