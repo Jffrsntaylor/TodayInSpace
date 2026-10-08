@@ -6,6 +6,9 @@ targetScope = 'resourceGroup'
 @description('Azure region for every resource.')
 param location string = resourceGroup().location
 
+@description('Tags applied to every resource.')
+param tags object = {}
+
 // ---------- Storage ----------
 
 @description('Storage account that holds the daily digests and archived images. Every past day lives here.')
@@ -22,10 +25,14 @@ param imagesContainerName string = 'images'
 param webAppName string
 param webPlanName string // VERIFY: live plan name is unknown
 
+@description('Operating system for the web app. Windows describes the original student site; the company site runs on Linux.')
+@allowed(['windows', 'linux'])
+param webOs string = 'windows'
+
 @description('App Service plan SKU for the web app, e.g. F1, D1, B1.')
 param webPlanSku string = 'F1' // VERIFY: likely Free/Shared, since the site has no custom domain
 
-@description('Always On is not available on Free/Shared plans.')
+@description('Always On keeps the site loaded between visits. Needs Basic (B1) or higher; not available on Free/Shared plans.')
 param webAlwaysOn bool = false // VERIFY
 
 // ---------- Function app ----------
@@ -73,6 +80,7 @@ var storageSecurity = {
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
+  tags: tags
   kind: 'StorageV2'
   sku: { name: storageSku }
   properties: storageSecurity
@@ -101,6 +109,7 @@ var separateFunctionStorage = functionStorageAccountName != storageAccountName
 resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = if (separateFunctionStorage) {
   name: functionStorageAccountName
   location: location
+  tags: tags
   kind: 'StorageV2' // VERIFY: if separate, its kind and SKU
   sku: { name: 'Standard_LRS' }
   properties: storageSecurity
@@ -118,6 +127,7 @@ var functionStorageConnectionString = separateFunctionStorage
 resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if (appInsights) {
   name: '${webAppName}-logs'
   location: location
+  tags: tags
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: 30
@@ -129,6 +139,7 @@ resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if
 resource appInsightsComponent 'Microsoft.Insights/components@2020-02-02' = if (appInsights) {
   name: '${webAppName}-insights'
   location: location
+  tags: tags
   kind: 'web'
   properties: {
     Application_Type: 'web'
@@ -150,25 +161,37 @@ var functionAppInsightsSettings = empty(functionAppInsightsConnectionString) ? [
 
 // ---------- Web app resources ----------
 
+var webIsLinux = webOs == 'linux'
+
+// Windows picks the .NET version through netFrameworkVersion plus the CURRENT_STACK metadata;
+// Linux uses linuxFxVersion instead. Only one set is sent, so the Windows site deploys exactly as before.
+var webRuntimeConfig = webIsLinux
+  ? { linuxFxVersion: 'DOTNETCORE|10.0' }
+  : {
+      netFrameworkVersion: 'v10.0'
+      metadata: [{ name: 'CURRENT_STACK', value: 'dotnet' }]
+    }
+
 resource webPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: webPlanName
   location: location
+  tags: tags
+  kind: webIsLinux ? 'linux' : null // Windows plans leave kind unset, as before
   sku: { name: webPlanSku }
   properties: {
-    reserved: false // Windows
+    reserved: webIsLinux // true means Linux
   }
 }
 
 resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: webAppName
   location: location
-  kind: 'app'
+  tags: tags
+  kind: webIsLinux ? 'app,linux' : 'app'
   properties: {
     serverFarmId: webPlan.id
     httpsOnly: true
-    siteConfig: {
-      netFrameworkVersion: 'v10.0'
-      metadata: [{ name: 'CURRENT_STACK', value: 'dotnet' }]
+    siteConfig: union(webRuntimeConfig, {
       alwaysOn: webAlwaysOn
       minTlsVersion: '1.2'
       ftpsState: 'Disabled' // VERIFY: may change live behavior if FTP deploys were ever used
@@ -177,7 +200,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'Storage__ContainerName', value: digestsContainerName }
         { name: 'Storage__ImagesContainerName', value: imagesContainerName }
       ], webAppInsightsSettings)
-    }
+    })
   }
 }
 
@@ -186,6 +209,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
 resource functionPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: functionPlanName
   location: location
+  tags: tags
   sku: {
     name: 'Y1'
     tier: 'Dynamic'
@@ -198,6 +222,7 @@ resource functionPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
 resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   location: location
+  tags: tags
   kind: 'functionapp'
   properties: {
     serverFarmId: functionPlan.id
@@ -220,6 +245,20 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
       ], functionAppInsightsSettings)
     }
   }
+}
+
+// CI deploys with publish profiles, which need SCM basic-auth publishing. Newer apps can have it switched off
+// by default, so turn it on explicitly. This goes away when CI moves to OIDC.
+resource webAppScmPublishing 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01' = {
+  parent: webApp
+  name: 'scm'
+  properties: { allow: true }
+}
+
+resource functionAppScmPublishing 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01' = {
+  parent: functionApp
+  name: 'scm'
+  properties: { allow: true }
 }
 
 // Names and hostnames only. Keys and connection strings are never output.
