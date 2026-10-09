@@ -1,6 +1,6 @@
 # Today in Space
 
-### [Open the live site →](https://tis-app-east-hqdhdkh5eqfwh2ee.eastus-01.azurewebsites.net/)
+### [Open the live site →](https://space.evergreensystemswa.com/)
 
 A web app I built that shows NASA's Astronomy Picture of the Day, the chance of seeing the northern lights, and a 3D globe that tracks the International Space Station and the Hubble Space Telescope in real time.
 
