@@ -275,6 +275,89 @@ a { color: var(--accent); }
 .card .value.text { font-size: 26px; }
 .card .sub { margin-top: 8px; font-size: 13px; font-style: italic; opacity: 0.85; }
 
+/* ---- Explainers ----
+   Term labels are buttons that open a plain-language panel (explainers.js). In the cards grid each panel
+   spans the full row; "dense" lets the other cards fill the row above, so on desktop the panel opens below
+   all three cards and on phones (one column) right under its own card. */
+.cards { grid-auto-flow: row dense; }
+.term {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    background: none;
+    border: 0;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.term:hover { color: var(--ink); }
+.term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.term-i {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    font-family: 'Manrope', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+    opacity: 0.8;
+}
+.term[aria-expanded="true"] { color: var(--ink); }
+.term[aria-expanded="true"] .term-i { background: var(--accent); border-color: var(--accent); color: #0b0e1c; opacity: 1; }
+/* "Kp" inside the aurora line reads as a word with a dotted underline, not a chip. */
+.term-inline { padding: 0; margin: 0; text-decoration: underline dotted; text-underline-offset: 3px; }
+.explainer {
+    grid-column: 1 / -1;
+    padding: 16px 20px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(8, 11, 24, 0.75);
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.6;
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 400;
+}
+.explainer[hidden] { display: none; }
+.explainer p { max-width: 75ch; }
+.explainer-scale { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; }
+.explainer-scale li {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid color-mix(in srgb, var(--alert) 40%, transparent);
+    background: color-mix(in srgb, var(--alert) 10%, transparent);
+    color: var(--ink);
+}
+.explainer-scale strong { font-weight: 700; margin-right: 4px; }
+.explainer-more { display: inline-block; margin-top: 12px; font-weight: 600; }
+.forecast .explainer, .sky-card .explainer { margin: 4px 0 18px; }
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ---- People in space ---- */
 .people .card { max-width: 320px; animation: rise .6s ease .2s both; }
 /* With the list of people: number on the left, station groups on the right. */
@@ -491,7 +574,6 @@ a { color: var(--accent); }
 }
 .cond-text { color: var(--ink); }
 .cond-text > div + div { margin-top: 2px; color: var(--ink-soft); }
-.cond abbr.kp { text-decoration: underline dotted; cursor: help; }
 /* A cloud column on pass and planet rows, only when there's a cloud forecast. */
 .sky-cloud { color: var(--ink-soft); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .with-clouds .pass { grid-template-columns: 5.5em 7.5em 1fr 7.5em 4em 3.8em; }

@@ -1,0 +1,7 @@
+@model TodayInSpace.Core.GlossaryEntry
+@* A term label that opens its explainer (_Explainer.cshtml). explainers.js does the toggling.
+   Pass ViewData["PanelId"] if the page shows this term's panel twice. *@
+@{
+    string panelId = ViewData["PanelId"] as string ?? "explain-" + Model.Id;
+}
+<button type="button" class="term" aria-expanded="false" aria-controls="@panelId">@Model.Term<span class="term-i" aria-hidden="true">i</span><span class="sr-only"> (what's this?)</span></button>

@@ -1,0 +1,19 @@
+@model TodayInSpace.Core.GlossaryEntry
+@* The plain-language panel for a term, hidden until its _ExplainTerm button opens it.
+   The words come from TodayInSpace.Core.Glossary. *@
+@{
+    string panelId = ViewData["PanelId"] as string ?? "explain-" + Model.Id;
+}
+<div class="explainer" id="@panelId" role="region" aria-label="About @Model.Term" hidden>
+    <p>@Model.Text</p>
+    @if (Model.Scale is { Count: > 0 } scale)
+    {
+        <ul class="explainer-scale" aria-label="NOAA geomagnetic storm scale">
+            @foreach (var level in scale)
+            {
+                <li><strong>Kp @level.Kp</strong> @level.GScale @level.Name</li>
+            }
+        </ul>
+    }
+    <a class="explainer-more" href="@TodayInSpace.Core.Glossary.LearnMoreUrl" target="_blank" rel="noopener">Learn more at NOAA SWPC</a>
+</div>
