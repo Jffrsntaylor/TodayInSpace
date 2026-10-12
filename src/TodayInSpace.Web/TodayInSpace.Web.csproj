@@ -11,6 +11,10 @@
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.28.0" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <!-- Draws the Earth snapshot PNG (/api/sky/earth.png). MIT licensed. The NoDependencies native build
+         runs on the Linux App Service without extra system libraries (no fontconfig needed, the image has no text). -->
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
   </ItemGroup>
 
   <ItemGroup>

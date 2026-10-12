@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TodayInSpace.Core.Snapshot;
 using TodayInSpace.Core.Visibility;
 using TodayInSpace.Web.Sky;
 
@@ -44,6 +45,26 @@ namespace TodayInSpace.Web.Controllers
 
             Response.Headers.CacheControl = "public, max-age=900";
             return Ok(sky);
+        }
+
+        // GET /api/sky/earth.png?lat=47.04&lon=-122.90&size=400   (all optional; also center=iss, format=card)
+        // A picture of the Earth right now: day and night, aurora, the ISS and its track, and a pin for the place.
+        // Without a place it's centred on the ISS. Made for home-screen widgets, which refresh a static image.
+        [HttpGet("earth.png")]
+        public async Task<IActionResult> GetEarth([FromQuery] double? lat, [FromQuery] double? lon, [FromQuery] string? center,
+            [FromQuery] int? size, [FromQuery] string? format, [FromServices] EarthSnapshotService earth)
+        {
+            var request = EarthSnapshotRequest.Parse(lat, lon, center, size, format);
+            if (request == null)
+                return BadRequest();
+
+            var png = await earth.GetPngAsync(request);
+            if (png == null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            // Matches the server's 10-minute picture, so widgets and link-preview crawlers don't ask more often.
+            Response.Headers.CacheControl = "public, max-age=600";
+            return File(png, "image/png");
         }
 
         // GET /api/sky/aurora

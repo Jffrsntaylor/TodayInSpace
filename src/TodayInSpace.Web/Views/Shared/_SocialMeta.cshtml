@@ -9,7 +9,9 @@
     var ogDescription = ViewData["OgDescription"] as string
         ?? "NASA's picture of the day, the aurora forecast, and a live 3D tracker for the ISS and Hubble.";
     var pageUrl = site + Context.Request.Path;
-    var imageUrl = site + "/img/og-image.png";
+    // The live Earth picture, ISS-centred, in the 1200×630 card shape. It's redrawn every 10 minutes,
+    // so a shared link shows the night side and the ISS where they were when the card was fetched.
+    var imageUrl = site + "/api/sky/earth.png?format=card";
 }
 <meta name="description" content="@ogDescription" />
 <meta name="theme-color" content="#04060d" />
@@ -24,9 +26,10 @@
 <meta property="og:description" content="@ogDescription" />
 <meta property="og:url" content="@pageUrl" />
 <meta property="og:image" content="@imageUrl" />
+<meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Today in Space: a 3D globe tracking the ISS and the Hubble Space Telescope" />
+<meta property="og:image:alt" content="The Earth right now, with the night side, aurora, and the International Space Station's path" />
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="@ogTitle" />
