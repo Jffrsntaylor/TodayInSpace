@@ -20,6 +20,8 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IPeopleStore, BlobPeopleStore>();
 // So do the launches (next launch + this year's count).
 builder.Services.AddSingleton<ILaunchStore, BlobLaunchStore>();
+// And the satellite counts, so the web app never downloads CelesTrak's 7 MB catalogue itself.
+builder.Services.AddSingleton<ISatelliteStore, BlobSatelliteStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<FlagIcons>();
 builder.Services.AddHttpClient<SkyDataService>(client =>

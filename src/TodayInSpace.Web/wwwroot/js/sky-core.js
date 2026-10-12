@@ -152,13 +152,15 @@ window.TISSky = (function () {
 
     // Adds when the data was fetched to a card's source line, and says so if it's getting old.
     // Old data is still shown: being honest about its age beats hiding it.
-    function showUpdated(id, updated, staleHours) {
+    // verb is "updated" unless given, e.g. "checked" for data that's re-checked but may not have changed.
+    function showUpdated(id, updated, staleHours, verb) {
         var source = $(id);
         var t = new Date(updated);
         if (!source || !updated || isNaN(t)) return;
         var age = Math.max(0, Date.now() - t);
-        source.title = 'Updated ' + t.toLocaleString();
-        source.appendChild(document.createTextNode(' · updated ' + timeAgo(age)));
+        verb = verb || 'updated';
+        source.title = verb.charAt(0).toUpperCase() + verb.slice(1) + ' ' + t.toLocaleString();
+        source.appendChild(document.createTextNode(' · ' + verb + ' ' + timeAgo(age)));
         if (age > staleHours * 3600000)
             source.appendChild(el('span', 'stale', ' · may be out of date'));
     }
@@ -214,23 +216,29 @@ window.TISSky = (function () {
         var list = $('launch-providers');
         var top = providers.slice(0, PROVIDERS_SHOWN);
         var max = top[0].count || 1;
-        top.forEach(function (p) {
-            var row = providerRow(p.name, p.count);
-            var fill = el('span', 'launch-bar-fill');
-            // Set from script, not a style="" attribute, so it still works once the CSP is enforced.
-            fill.style.width = Math.max(2, Math.round(p.count / max * 100)) + '%';
-            row.querySelector('.launch-bar').appendChild(fill);
-            list.appendChild(row);
-        });
+        top.forEach(function (p) { list.appendChild(barRow(p.name, p.count, max)); });
         var others = providers.slice(PROVIDERS_SHOWN).reduce(function (sum, p) { return sum + p.count; }, 0);
         if (others > 0) list.appendChild(providerRow('Others', others, 'others'));
         list.hidden = false;
     }
 
-    function providerRow(name, count, extra) {
+    // A row with its bar filled relative to the biggest count. Also used by the Satellites card.
+    function barRow(name, count, max, flag) {
+        var row = providerRow(name, count, null, flag);
+        var fill = el('span', 'launch-bar-fill');
+        // Set from script, not a style="" attribute, so it still works once the CSP is enforced.
+        fill.style.width = Math.max(2, Math.round(count / max * 100)) + '%';
+        row.querySelector('.launch-bar').appendChild(fill);
+        return row;
+    }
+
+    function providerRow(name, count, extra, flag) {
         var row = el('li', 'launch-provider' + (extra ? ' ' + extra : ''));
         row.appendChild(el('span', 'launch-bar'));
-        var label = el('span', 'launch-provider-name', name);
+        var label = el('span', 'launch-provider-name');
+        var img = flagImg(flag);
+        if (img) label.appendChild(img);
+        label.appendChild(document.createTextNode(name));
         label.title = name;
         row.appendChild(label);
         row.appendChild(el('span', 'launch-provider-count', fmt.format(count)));
@@ -325,6 +333,70 @@ window.TISSky = (function () {
         if (d > 0) return 'T−' + d + 'd ' + h + 'h';
         if (h > 0) return 'T−' + h + 'h ' + m + 'm';
         return 'T−' + m + 'm';
+    }
+
+    // ---- Satellites ----
+
+    // The function checks every 6 hours, so 30 hours means five checks in a row were missed.
+    var SATELLITES_STALE_HOURS = 30;
+    var OWNERS_SHOWN = 5;
+    // SATCAT's code for objects with no owner yet. Counted in "Others", never shown on its own.
+    var UNASSIGNED = 'TBD';
+
+    // The section stays hidden unless a real number arrives. The number is shown first, and the rest
+    // in a try/catch, so a problem with the breakdown can never hide the number too.
+    getJson('/api/sky/satellites').then(function (data) {
+        var section = $('satellites');
+        if (!section || !data || typeof data.active !== 'number') return;
+        $('sat-active').textContent = fmt.format(data.active);
+        section.hidden = false;
+        try {
+            showSatelliteSource(data);
+            if (data.starlink > 0 && data.active > 0) {
+                var box = $('sat-starlink');
+                box.textContent = fmt.format(data.starlink) + ' of them are Starlink (' +
+                    Math.round(data.starlink / data.active * 100) + '%)';
+                box.hidden = false;
+            }
+            if (Array.isArray(data.owners) && data.owners.length) showOwners(data.owners, data.active);
+            if (typeof data.inOrbit === 'number') showInventory(data);
+        } catch (e) {
+            console.error('Couldn’t show the satellite breakdown', e);
+        }
+    }).catch(function () { /* no data and no cached copy: keep the card hidden */ });
+
+    // The server sorts owners by count, then name. The top few get a bar and a flag; the rest are summed.
+    function showOwners(owners, active) {
+        var list = $('sat-owners');
+        var top = owners.filter(function (o) { return o.code !== UNASSIGNED; }).slice(0, OWNERS_SHOWN);
+        if (!top.length) return;
+        var max = top[0].count || 1;
+        var shown = 0;
+        top.forEach(function (o) {
+            list.appendChild(barRow(o.name, o.count, max, o.flag ? { code: o.flag, country: o.name } : null));
+            shown += o.count;
+        });
+        if (active - shown > 0) list.appendChild(providerRow('Others', active - shown, 'others'));
+        list.hidden = false;
+    }
+
+    // "34,970 tracked objects in Earth orbit: 20,095 satellites · 12,523 debris · 2,297 rocket bodies"
+    function showInventory(data) {
+        var parts = [fmt.format(data.payloads) + ' satellites', fmt.format(data.debris) + ' debris',
+                     fmt.format(data.rocketBodies) + ' rocket bodies'];
+        if (data.unknown > 0) parts.push(fmt.format(data.unknown) + ' unknown');
+        var box = $('sat-inventory');
+        box.textContent = fmt.format(data.inOrbit) + ' tracked objects in Earth orbit: ' + parts.join(' · ');
+        box.hidden = false;
+    }
+
+    // "Source: CelesTrak SATCAT · catalog updated Oct 11 · checked 2 hours ago"
+    function showSatelliteSource(data) {
+        var t = new Date(data.catalogUpdated);
+        if (data.catalogUpdated && !isNaN(t))
+            $('satellites-source').appendChild(document.createTextNode(
+                ' · catalog updated ' + t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })));
+        showUpdated('satellites-source', data.checked, SATELLITES_STALE_HOURS, 'checked');
     }
 
     function el(tag, className, text) {
