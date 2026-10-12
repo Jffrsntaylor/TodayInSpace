@@ -326,6 +326,75 @@ a { color: var(--accent); }
     .satellites .card { grid-template-columns: 1fr; padding: 20px 14px; }
 }
 
+/* ---- Your sky this week ---- */
+/* Location form, then visible passes grouped by day. The form and each pass row stack on phones. */
+.sky-card { --c: var(--accent); text-align: left; animation: rise .6s ease .2s both; }
+.sky-card:hover { transform: none; }
+.sky-where { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.sky-where[hidden] { display: none; }
+.sky-where label { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-soft); }
+.sky-zip-row { display: flex; gap: 8px; }
+.sky-where input {
+    width: 7.5em;
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px; /* 16px stops iOS zooming in on focus */
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ink);
+}
+.sky-where input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sky-showing { color: var(--ink-soft); font-size: 15px; }
+.sky-showing strong { color: var(--ink); }
+.sky-change {
+    font: inherit; color: var(--accent); background: none; border: none; padding: 0;
+    text-decoration: underline; cursor: pointer;
+}
+.sky-change:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sky-error { margin-top: 12px; font-size: 14px; color: var(--watch); }
+.sky-intro { margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+.sky-passes { color: var(--ink); font-size: 14px; }
+.sky-passes[aria-busy="true"] { margin-top: 14px; color: var(--ink-soft); }
+.pass-day { margin-top: 18px; }
+.pass-day-title {
+    font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 6px;
+}
+.pass-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pass {
+    display: grid;
+    grid-template-columns: 5.5em 7.5em 1fr 7.5em 4em;
+    gap: 4px 14px;
+    align-items: baseline;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface);
+}
+.pass-sat { font-weight: 700; color: #b7c0ff; }
+.pass-tiangong .pass-sat { color: #5fd3e6; }
+.pass-hubble .pass-sat { color: #ffc46b; }
+.pass-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pass-path, .pass-height, .pass-length { color: var(--ink-soft); }
+.pass-length { text-align: right; font-variant-numeric: tabular-nums; }
+.pass-notes { list-style: none; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
+.sky-help { margin-top: 12px; font-size: 12px; color: var(--ink-faint); font-style: italic; }
+@media (max-width: 640px) {
+    .sky-card { padding: 20px 14px; }
+    .sky-where { flex-direction: column; align-items: stretch; }
+    .sky-zip-row input { flex: 1; }
+    /* Two lines per pass: satellite, time and length, then direction and height. */
+    .pass {
+        grid-template-columns: 5em 1fr auto;
+        grid-template-areas: "sat time length" "path path height";
+    }
+    .pass-sat { grid-area: sat; }
+    .pass-time { grid-area: time; }
+    .pass-length { grid-area: length; }
+    .pass-path { grid-area: path; }
+    .pass-height { grid-area: height; text-align: right; }
+}
+
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }
 .card .source .stale { color: var(--watch); }
 

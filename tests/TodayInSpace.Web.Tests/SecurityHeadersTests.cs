@@ -18,7 +18,7 @@ namespace TodayInSpace.Web.Tests
         [InlineData("X-Content-Type-Options", "nosniff")]
         [InlineData("Referrer-Policy", "strict-origin-when-cross-origin")]
         [InlineData("X-Frame-Options", "DENY")]
-        [InlineData("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")]
+        [InlineData("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), payment=(), usb=()")]
         [InlineData("Cross-Origin-Opener-Policy", "same-origin")]
         public async Task AddsHeader(string name, string expected)
         {

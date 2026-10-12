@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TodayInSpace.Core.Visibility;
 using TodayInSpace.Web.Sky;
 
 namespace TodayInSpace.Web.Controllers
@@ -28,6 +29,21 @@ namespace TodayInSpace.Web.Controllers
 
             Response.Headers.CacheControl = "public, max-age=3600";
             return Ok(tle);
+        }
+
+        // GET /api/sky/visible?lat=47.04&lon=-122.90
+        // Visible ISS, Tiangong and Hubble passes for the next 7 days. Takes lat/lon rather than a zip so an app
+        // with GPS can call it directly. The service is injected here so the other endpoints don't build it.
+        [HttpGet("visible")]
+        public async Task<IActionResult> GetVisible([FromQuery] double? lat, [FromQuery] double? lon, [FromServices] VisibleSkyService visible)
+        {
+            if (!SkyLocation.IsValid(lat, lon))
+                return BadRequest();
+
+            var sky = await visible.GetAsync(lat!.Value, lon!.Value);
+
+            Response.Headers.CacheControl = "public, max-age=900";
+            return Ok(sky);
         }
 
         // GET /api/sky/aurora

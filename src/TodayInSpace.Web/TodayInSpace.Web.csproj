@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Zip code locations, read at startup by ZipLookup. Rebuilt by tools/build-zip-data.py. -->
+    <Content Include="Data\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TodayInSpace.Core\TodayInSpace.Core.csproj" />
   </ItemGroup>
 
