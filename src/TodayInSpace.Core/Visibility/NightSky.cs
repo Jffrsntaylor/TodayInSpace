@@ -18,7 +18,11 @@ namespace TodayInSpace.Core.Visibility
         DateTime? Rise,
         DateTime? Set,
         double Elongation,
-        string? Reason);
+        string? Reason)
+    {
+        // Cloud cover at the best time, for visible planets with a cloud forecast; otherwise null.
+        public int? CloudPercent { get; init; }
+    }
 
     // Illumination is 0..1. Rise and Set are only given when they happen during darkness.
     public record MoonTonight(string Phase, double Illumination, DateTime? Rise, DateTime? Set, bool UpDuringDarkness);

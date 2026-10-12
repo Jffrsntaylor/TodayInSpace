@@ -33,6 +33,15 @@ builder.Services.AddHttpClient<SkyDataService>(client =>
 // "Your sky this week": zip code locations (loaded once) and visible passes, cached per rounded location.
 builder.Services.AddSingleton<ZipLookup>();
 builder.Services.AddSingleton<VisibleSkyCache>();
+// Place names and cloud cover from the National Weather Service. NWS asks for a User-Agent that identifies the app.
+// The request URLs contain the (rounded) location, so HttpClient's own request logging is turned off for this client.
+builder.Services.AddSingleton<NwsCache>();
+builder.Services.AddHttpClient<NwsWeatherService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TodayInSpace/1.0 (+https://space.evergreensystemswa.com)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/geo+json");
+}).RemoveAllLoggers();
 builder.Services.AddScoped<VisibleSkyService>();
 
 // /healthz: can we read storage, and did the daily function publish recently?

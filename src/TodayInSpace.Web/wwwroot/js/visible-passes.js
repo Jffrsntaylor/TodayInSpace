@@ -1,8 +1,11 @@
 // "Your sky this week": when the ISS, Tiangong and Hubble can be seen from the visitor's location,
-// and which planets are up tonight and what the Moon is doing.
+// which planets are up tonight and what the Moon is doing, and whether you'll see any of it:
+// aurora odds and (in the US) cloud cover from the National Weather Service.
 //  - Location is a US zip (looked up by /api/location/zip) or the browser's geolocation
 //  - lat/lon are rounded to 2 decimals (about 1 km) before they leave the browser
 //  - The location is remembered in this browser's localStorage only
+//  - Times are shown in the place's own time zone when the API knows it, so a zip in another state
+//    shows that place's local times
 (function () {
     'use strict';
 
@@ -16,9 +19,10 @@
     var form = $('sky-where'), zipInput = $('sky-zip'), geoButton = $('sky-geo');
     var showing = $('sky-showing'), place = $('sky-place'), errorBox = $('sky-error');
     var intro = $('sky-intro'), list = $('sky-passes'), help = $('sky-help'), tonightBox = $('sky-tonight');
+    var conditionsBox = $('sky-conditions');
 
-    var timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    var dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    // Rebuilt by useTimeZone for each response.
+    var timeFmt, dayFmt, keyFmt, zoneName;
 
     var round2 = function (n) { return Math.round(n * 100) / 100; };
 
@@ -34,6 +38,47 @@
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(loc)); } catch (e) { /* ignore */ }
     }
 
+    // timeZone is an IANA name ("America/Los_Angeles"), or null for the browser's own zone.
+    // An unknown name throws in Intl, so fall back to the browser's zone.
+    function useTimeZone(timeZone) {
+        try {
+            makeFormats(timeZone || undefined);
+        } catch (e) {
+            timeZone = null;
+            makeFormats(undefined);
+        }
+        zoneName = timeZone ? genericZoneName(timeZone) : null;
+    }
+    function makeFormats(timeZone) {
+        timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone: timeZone });
+        dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: timeZone });
+        keyFmt = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: timeZone });
+    }
+    useTimeZone(null);
+
+    // "Pacific Time". Older browsers don't know 'longGeneric'; then the label just isn't shown.
+    function genericZoneName(timeZone) {
+        try {
+            var part = new Intl.DateTimeFormat('en-US', { timeZone: timeZone, timeZoneName: 'longGeneric' })
+                .formatToParts(new Date()).filter(function (p) { return p.type === 'timeZoneName'; })[0];
+            return part ? part.value : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // The calendar date in the current zone as "YYYY-MM-DD", so days can be compared as strings.
+    function dayKey(date) {
+        var parts = {};
+        keyFmt.formatToParts(date).forEach(function (p) { parts[p.type] = p.value; });
+        return parts.year + '-' + parts.month + '-' + parts.day;
+    }
+    function nextDayKey(key) {
+        var d = new Date(key + 'T12:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        return d.toISOString().slice(0, 10);
+    }
+
     function showError(message) {
         errorBox.textContent = message;
         errorBox.hidden = !message;
@@ -45,8 +90,10 @@
         zipInput.focus();
     }
 
-    function useLocation(lat, lon, label) {
+    // name is the zip's postal city and state ("Olympia, WA"), when the zip lookup has one.
+    function useLocation(lat, lon, label, name) {
         var loc = { lat: round2(lat), lon: round2(lon), label: label };
+        if (name) loc.name = name;
         remember(loc);
         load(loc);
     }
@@ -60,17 +107,19 @@
         list.textContent = 'Working out passes…';
         list.setAttribute('aria-busy', 'true');
         tonightBox.hidden = true;
+        conditionsBox.hidden = true;
 
         fetch('/api/sky/visible?lat=' + loc.lat + '&lon=' + loc.lon)
             .then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
             })
-            .then(render)
+            .then(function (data) { render(data, loc); })
             .catch(function () {
                 list.textContent = '';
                 help.hidden = true;
                 tonightBox.hidden = true;
+                conditionsBox.hidden = true;
                 showError('We couldn’t load the passes right now. Please try again in a few minutes.');
             })
             .then(function () { list.removeAttribute('aria-busy'); });
@@ -87,11 +136,26 @@
 
     // Passes are grouped by local calendar day rather than by night: most ISS passes are before dawn,
     // and "Mon, Oct 12" over a 5 am Tuesday pass was confusing.
-    function dayOf(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
+    function dayTitle(key, date, today) {
+        return key === today ? 'Today' : key === nextDayKey(today) ? 'Tomorrow' : dayFmt.format(date);
+    }
 
-    function dayTitle(day, today) {
-        var diff = Math.round((day - today) / 86400000);
-        return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : dayFmt.format(day);
+    // A small "☁ 25%" for a pass or planet row; nothing without a cloud forecast.
+    function cloudTag(percent) {
+        if (percent == null) return null;
+        var tag = el('span', 'sky-cloud', '☁ ' + percent + '%');
+        tag.title = percent + '% cloud cover forecast';
+        return tag;
+    }
+
+    // "Olympia, WA (98501)", or just the zip / "your location" outside the US.
+    // A zip's own postal name wins over the weather service's, which is the town nearest its forecast
+    // grid point (Tumwater for 98501).
+    function placeLabel(data, loc) {
+        var name = typeof loc.name === 'string' ? loc.name
+            : data.place ? data.place.city + ', ' + data.place.state : null;
+        if (!name) return loc.label;
+        return /^\d{5}$/.test(loc.label) ? name + ' (' + loc.label + ')' : name;
     }
 
     function el(tag, className, text) {
@@ -101,19 +165,23 @@
         return node;
     }
 
-    function render(data) {
+    function render(data, loc) {
+        useTimeZone(data.place && data.place.timeZone);
+        place.textContent = placeLabel(data, loc);
+        section.classList.toggle('with-clouds', !!data.clouds);
         list.textContent = '';
         var now = Date.now();
         var passes = (data.passes || []).filter(function (p) { return Date.parse(p.end.time) > now; });
-        var today = dayOf(new Date(now));
+        var today = dayKey(new Date(now));
+        renderConditions(data, today);
 
         var groups = [];
         passes.forEach(function (p) {
             var start = new Date(p.start.time);
-            var day = dayOf(start);
+            var key = dayKey(start);
             var group = groups[groups.length - 1];
-            if (!group || group.day.getTime() !== day.getTime()) {
-                group = { day: day, passes: [] };
+            if (!group || group.key !== key) {
+                group = { key: key, date: start, passes: [] };
                 groups.push(group);
             }
             group.passes.push({ pass: p, start: start });
@@ -121,7 +189,7 @@
 
         groups.forEach(function (g) {
             var block = el('div', 'pass-day');
-            block.appendChild(el('h3', 'pass-day-title', dayTitle(g.day, today)));
+            block.appendChild(el('h3', 'pass-day-title', dayTitle(g.key, g.date, today)));
             var ul = el('ul', 'pass-list');
             g.passes.forEach(function (item) {
                 var p = item.pass;
@@ -133,6 +201,8 @@
                 li.appendChild(el('span', 'pass-path', 'from ' + compass(p.start.azimuth) + ' to ' + compass(p.end.azimuth)));
                 li.appendChild(el('span', 'pass-height', height(p.max.elevation)));
                 li.appendChild(el('span', 'pass-length', minutes(p.durationSeconds)));
+                var cloud = cloudTag(p.cloudPercent);
+                if (cloud) li.appendChild(cloud);
                 ul.appendChild(li);
             });
             block.appendChild(ul);
@@ -153,8 +223,82 @@
         });
         if (notes.childNodes.length) list.appendChild(notes);
 
+        help.textContent = (zoneName ? 'Times in ' + zoneName + '.' : 'Times in your time zone.') +
+            ' Predictions can shift by a minute or two as orbits change.';
         help.hidden = passes.length === 0;
         renderTonight(data);
+    }
+
+    // The aurora and cloud lines at the top: "will I actually see it?"
+    function renderConditions(data, today) {
+        conditionsBox.textContent = '';
+        if (data.aurora) conditionsBox.appendChild(auroraRow(data.aurora, today));
+
+        var clouds = data.clouds;
+        if (clouds && clouds.tonightMin != null) {
+            var range = clouds.tonightMin === clouds.tonightMax
+                ? clouds.tonightMin + '%' : clouds.tonightMin + '–' + clouds.tonightMax + '%';
+            var row = el('div', 'cond');
+            row.appendChild(el('span', 'cond-label', 'Clouds'));
+            row.appendChild(el('div', 'cond-text', 'Tonight ' + range + ' cloudy'));
+            conditionsBox.appendChild(row);
+        }
+        conditionsBox.hidden = !conditionsBox.childNodes.length;
+    }
+
+    function kpAbbr() {
+        var abbr = el('abbr', 'kp', 'Kp');
+        abbr.title = 'Kp measures geomagnetic activity from 0 to 9';
+        return abbr;
+    }
+
+    // "Tonight: unlikely (Kp 3 forecast; you'd need about Kp 5 to see it low in the north)",
+    // then the other nights on one line, then OVATION's chance right now.
+    function auroraRow(aurora, today) {
+        var row = el('div', 'cond');
+        row.appendChild(el('span', 'cond-label', 'Aurora'));
+        var body = el('div', 'cond-text');
+        var low = 'low in the ' + (aurora.geomagneticLatitude < 0 ? 'south' : 'north');
+        var words = { overhead: 'possible overhead', horizon: 'possible ' + low, unlikely: 'unlikely' };
+
+        var nights = (aurora.nights || []).filter(function (n) { return n.date >= today; });
+        var more = [];
+        nights.forEach(function (n, i) {
+            var title = n.date === today ? 'Tonight' : weekday(n.date);
+            if (i === 0) {
+                var first = el('div', null, title + ': ' + words[n.chance] + ' (');
+                first.appendChild(kpAbbr());
+                first.appendChild(document.createTextNode(' ' + n.kp + ' forecast' + needed(aurora, n, low) + ')'));
+                body.appendChild(first);
+            } else {
+                more.push(title + ': ' + words[n.chance] + (n.chance === 'unlikely' ? '' : ' (Kp ' + n.kp + ')'));
+            }
+        });
+        if (more.length) body.appendChild(el('div', null, more.join(' · ')));
+
+        if (aurora.nowPercent != null) {
+            body.appendChild(el('div', 'cond-now', 'Right now: ' +
+                (aurora.nowPercent < 5 ? 'under 5%' : aurora.nowPercent + '%') + ' chance overhead'));
+        }
+        row.appendChild(body);
+        return row;
+    }
+
+    // What it would take, said once for the first night.
+    function needed(aurora, night, low) {
+        if (night.chance === 'overhead') return '';
+        if (night.chance === 'horizon') {
+            return aurora.kpForOverhead != null ? '; about Kp ' + aurora.kpForOverhead + ' would put it overhead' : '';
+        }
+        return aurora.kpForHorizon != null
+            ? '; you’d need about Kp ' + aurora.kpForHorizon + ' to see it ' + low
+            : '; it would take a rare, extreme storm to see it from this far ' + (aurora.geomagneticLatitude < 0 ? 'north' : 'south');
+    }
+
+    // "2026-10-14" -> "Wed". It's a calendar day, so format it at noon UTC to keep the right day name.
+    function weekday(date) {
+        return new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' })
+            .format(new Date(date + 'T12:00:00Z'));
     }
 
     var PHASES = {
@@ -211,6 +355,8 @@
                 li.appendChild(el('span', 'planet-where', where(p.best)));
                 li.appendChild(el('span', 'planet-best', bestTime(p.best, data.darkness, data.generated)));
                 li.appendChild(el('span', 'planet-riseset', riseSet(p)));
+                var cloud = cloudTag(p.cloudPercent);
+                if (cloud) li.appendChild(cloud);
                 ul.appendChild(li);
             });
             if (ul.childNodes.length) tonightBox.appendChild(ul);
@@ -262,7 +408,7 @@
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
             })
-            .then(function (z) { useLocation(z.lat, z.lon, z.zip); })
+            .then(function (z) { useLocation(z.lat, z.lon, z.zip, z.city && z.state ? z.city + ', ' + z.state : null); })
             .catch(function (err) {
                 showError(err.message === 'unknown'
                     ? 'We couldn’t find that zip code.'
