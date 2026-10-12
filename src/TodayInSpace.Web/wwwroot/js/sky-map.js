@@ -23,6 +23,30 @@
         return '#35d49a';
     }
 
+    // CARTO's dark basemap. Since 2026-09 every tile needs a key, and without one CARTO serves an
+    // "API KEY REQUIRED" image instead. With no key (or tiles that keep failing) the map goes without a
+    // basemap: the dark page background still reads as a night map, and the overlays don't need tiles.
+    var MAX_TILE_ERRORS = 5;
+
+    function addBasemap() {
+        var key = el.getAttribute('data-carto-key') || '';
+        if (!key) {
+            console.warn('Map: no CARTO key configured (Map:CartoKey), showing the map without a basemap.');
+            return;
+        }
+        var errors = 0;
+        var tiles = L.tileLayer('https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(key), {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        });
+        tiles.on('tileerror', function () {
+            if (++errors !== MAX_TILE_ERRORS) return;
+            console.warn('Map: CARTO tiles keep failing, hiding the basemap.');
+            map.removeLayer(tiles);
+        });
+        tiles.addTo(map);
+    }
+
     // The map is created the first time its tab is shown (Leaflet needs a visible container to size itself).
     function init() {
         if (map) return;
@@ -37,11 +61,7 @@
             zoomSnap: 0.5
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        }).addTo(map);
+        addBasemap();
 
         canvas = L.canvas({ padding: 0.5 });
         nightLayer = L.polygon([], { renderer: canvas, stroke: false, fillColor: '#00030d', fillOpacity: 0.5, interactive: false }).addTo(map);
