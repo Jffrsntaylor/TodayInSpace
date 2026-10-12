@@ -221,6 +221,60 @@ namespace TodayInSpace.Web.Tests
             Assert.Equal("United Launch Alliance", vulcan.Provider);
         }
 
+        // The fixture's pad coordinates were added by hand on 2026-10-12 (SLC-4E as verified against LL2 on
+        // 10-11); SLC-41's are null, the way LL2 sends a pad it has no position for.
+        [Fact]
+        public void ParseUpcoming_RealPage_KeepsPadNameAndPosition()
+        {
+            var upcoming = Launches.ParseUpcoming(Fixture("ll2-launches-upcoming.json"))!;
+
+            Assert.Equal("Space Launch Complex 4E", upcoming[0].PadName);
+            Assert.Equal(34.632, upcoming[0].PadLat);
+            Assert.Equal(-120.611, upcoming[0].PadLon);
+            Assert.Equal((30.4, 130.977), (upcoming[3].PadLat, upcoming[3].PadLon));
+
+            var vulcan = upcoming[4];
+            Assert.Equal("Space Launch Complex 41", vulcan.PadName);
+            Assert.Null(vulcan.PadLat);
+            Assert.Null(vulcan.PadLon);
+        }
+
+        [Theory]
+        [InlineData(@"""28.56194122""", @"""-80.57735736""", 28.56194122, -80.57735736)]
+        [InlineData("28.5", @"""-80.5""", 28.5, -80.5)]
+        [InlineData(@"""""", "-80.5", null, null)]
+        [InlineData(@""" n/a""", "-80.5", null, null)]
+        [InlineData("95", "-80.5", null, null)]
+        [InlineData("28.5", "181", null, null)]
+        [InlineData("28.5", "null", null, null)]
+        [InlineData("{}", "-80.5", null, null)]
+        public void ParsePage_PadCoordinates_NumbersOrNumericStringsOnly(string lat, string lon, double? wantLat, double? wantLon)
+        {
+            var json = @"{""count"": 1, ""results"": [{""id"": ""a"", ""name"": ""Test"", ""net"": ""2026-10-13T00:00:00Z"",
+                ""status"": {""id"": 1, ""abbrev"": ""Go""},
+                ""pad"": {""name"": ""Pad 1"", ""latitude"": " + lat + @", ""longitude"": " + lon + "}}]}";
+
+            var launch = LaunchesParser.ParsePage(json)!.Launches.Single();
+
+            Assert.Equal("Pad 1", launch.PadName);
+            Assert.Equal(wantLat, launch.PadLat);
+            Assert.Equal(wantLon, launch.PadLon);
+        }
+
+        [Fact]
+        public void ParsePage_NoPad_PadFieldsAreNull()
+        {
+            var json = @"{""count"": 1, ""results"": [{""id"": ""a"", ""name"": ""Test"", ""net"": ""2026-10-13T00:00:00Z"",
+                ""status"": {""id"": 1, ""abbrev"": ""Go""}, ""pad"": null}]}";
+
+            var launch = LaunchesParser.ParsePage(json)!.Launches.Single();
+
+            Assert.Null(launch.PadName);
+            Assert.Null(launch.PadLat);
+            Assert.Null(launch.PadLon);
+            Assert.Null(launch.Location);
+        }
+
         [Fact]
         public void ParseUpcoming_NotALaunchesPage_ReturnsNull()
         {
@@ -331,6 +385,37 @@ namespace TodayInSpace.Web.Tests
 
             Assert.Contains(@"""stats"":{""year"":2026", json);
             Assert.Contains(@"""statusId"":1", json);
+        }
+
+        // The browser reads these exact names, so a rename would quietly break the card and the globe.
+        [Fact]
+        public void Serialize_UpcomingLaunchShape()
+        {
+            var launch = new UpcomingLaunch("Falcon 9 Block 5 | Starlink", Now, "SEC", Launches.StatusGo, "Go", 90, "SpaceX",
+                "Vandenberg SFB, CA, USA", "Space Launch Complex 4E", 34.632, -120.611);
+
+            var json = Launches.Serialize(new LaunchesSnapshot(null, new[] { launch }, Now, Launches.Source));
+
+            Assert.Contains(@"""upcoming"":[{""name"":""Falcon 9 Block 5 | Starlink"",""net"":""2026-10-11T12:45:00+00:00"",""precision"":""SEC"","
+                + @"""statusId"":1,""statusAbbrev"":""Go"",""probability"":90,""provider"":""SpaceX"",""location"":""Vandenberg SFB, CA, USA"","
+                + @"""padName"":""Space Launch Complex 4E"",""padLat"":34.632,""padLon"":-120.611}]", json);
+        }
+
+        // Snapshots stored before the pad fields existed must still load, with the pad unknown.
+        [Fact]
+        public void Parse_SnapshotWithoutPadFields_ReadsPadAsNull()
+        {
+            var json = @"{""stats"":null,""upcoming"":[{""name"":""Falcon 9 Block 5 | Starlink"",""net"":""2026-10-12T00:11:47+00:00"","
+                + @"""precision"":""SEC"",""statusId"":1,""statusAbbrev"":""Go"",""probability"":null,""provider"":""SpaceX"","
+                + @"""location"":""Vandenberg SFB, CA, USA""}],""updated"":""2026-10-11T12:45:00+00:00"",""source"":""The Space Devs""}";
+
+            var launch = Launches.Parse(json)!.Upcoming.Single();
+
+            Assert.Equal("Falcon 9 Block 5 | Starlink", launch.Name);
+            Assert.Equal("Vandenberg SFB, CA, USA", launch.Location);
+            Assert.Null(launch.PadName);
+            Assert.Null(launch.PadLat);
+            Assert.Null(launch.PadLon);
         }
 
         [Theory]

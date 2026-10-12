@@ -3,8 +3,10 @@ using System.Text.Json;
 namespace TodayInSpace.Core
 {
     // One launch as LL2 lists it. ProviderId is null when LL2 has no launch service provider.
+    // The pad fields are null when LL2 doesn't have them, so a launch is never dropped for a missing pad.
     public record Ll2Launch(string Id, string Name, DateTimeOffset Net, int StatusId, string StatusAbbrev,
-                            int? ProviderId, string? ProviderName, string? Precision, int? Probability, string? Location);
+                            int? ProviderId, string? ProviderName, string? Precision, int? Probability, string? Location,
+                            string? PadName = null, double? PadLat = null, double? PadLon = null);
 
     // One page of an LL2 launches list. Next is the URL of the following page, or null on the last one.
     public record Ll2LaunchPage(IReadOnlyList<Ll2Launch> Launches, string? Next, int Count);
@@ -68,14 +70,40 @@ namespace TodayInSpace.Core
                 : null;
             // Null for most launches: LL2 only has a weather forecast in the last few days.
             int? probability = IntProp(l, "probability");
-            string? location = l.TryGetProperty("pad", out var pad) && pad.ValueKind == JsonValueKind.Object
-                && pad.TryGetProperty("location", out var loc) && loc.ValueKind == JsonValueKind.Object
-                ? StringProp(loc, "name")?.Trim()
-                : null;
+            string? location = null, padName = null;
+            double? padLat = null, padLon = null;
+            if (l.TryGetProperty("pad", out var pad) && pad.ValueKind == JsonValueKind.Object)
+            {
+                if (pad.TryGetProperty("location", out var loc) && loc.ValueKind == JsonValueKind.Object)
+                    location = StringProp(loc, "name")?.Trim();
+                padName = StringProp(pad, "name")?.Trim();
+                // Both or neither: half a position can't be put on the globe.
+                padLat = DegreesProp(pad, "latitude", 90);
+                padLon = DegreesProp(pad, "longitude", 180);
+                if (padLat == null || padLon == null)
+                    padLat = padLon = null;
+            }
 
             return new Ll2Launch(id, name, net, statusId, StringProp(status, "abbrev") ?? "", providerId,
                 string.IsNullOrEmpty(providerName) ? null : providerName, precision, probability,
-                string.IsNullOrEmpty(location) ? null : location);
+                string.IsNullOrEmpty(location) ? null : location,
+                string.IsNullOrEmpty(padName) ? null : padName, padLat, padLon);
+        }
+
+        // LL2 sends pad coordinates as numbers today, but older versions sent strings like "28.56194122",
+        // and unknown ones come as null. Anything out of range is treated as unknown too.
+        private static double? DegreesProp(JsonElement obj, string name, double max)
+        {
+            if (!obj.TryGetProperty(name, out var el))
+                return null;
+            double value;
+            if (el.ValueKind == JsonValueKind.Number)
+                value = el.GetDouble();
+            else if (el.ValueKind != JsonValueKind.String
+                     || !double.TryParse(el.GetString(), System.Globalization.NumberStyles.Float,
+                         System.Globalization.CultureInfo.InvariantCulture, out value))
+                return null;
+            return double.IsFinite(value) && Math.Abs(value) <= max ? value : null;
         }
 
         // TryGetInt32 throws on a JSON null, which LL2 sends for fields it doesn't know yet.

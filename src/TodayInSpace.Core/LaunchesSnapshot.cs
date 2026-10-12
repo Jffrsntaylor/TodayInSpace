@@ -13,8 +13,10 @@ namespace TodayInSpace.Core
 
     // Precision is LL2's net_precision abbrev (SEC, MIN, HR, DAY, M, Q...). It decides whether the front end
     // may show a time and a countdown, because far-off launches carry placeholder times like 00:00:00Z.
+    // The pad fields put the launch on the globe. They were added later, so older snapshots read them as null.
     public record UpcomingLaunch(string Name, DateTimeOffset Net, string Precision, int StatusId, string StatusAbbrev,
-                                 int? Probability, string Provider, string? Location);
+                                 int? Probability, string Provider, string? Location,
+                                 string? PadName = null, double? PadLat = null, double? PadLon = null);
 
     public record ProviderCount(string Name, int Count);
 
@@ -143,7 +145,7 @@ namespace TodayInSpace.Core
                 .OrderBy(l => l.Net)
                 .Take(UpcomingKept)
                 .Select(l => new UpcomingLaunch(l.Name, l.Net, l.Precision ?? "", l.StatusId, l.StatusAbbrev,
-                    l.Probability, ProviderName(l.ProviderId, l.ProviderName), l.Location))
+                    l.Probability, ProviderName(l.ProviderId, l.ProviderName), l.Location, l.PadName, l.PadLat, l.PadLon))
                 .ToList();
 
         // Puts fresh parts together with whatever is kept from the last snapshot. Null when nothing new

@@ -3,6 +3,7 @@
 // the aurora forecast as a glowing shell, city lights on the night side, and sunlight from the Sun's real direction.
 // With a location saved in "Your sky", also a pin there, your next visible ISS pass drawn in space, and the
 // selected satellite's footprint: where on Earth it's at least 10° above the horizon right now.
+// The upcoming launches' pads get a small rocket, and the next one a label with its countdown.
 (function () {
     'use strict';
 
@@ -275,6 +276,7 @@
             shown.push(m);
         });
         if (you.loc) shown.push(you.pin);
+        Array.prototype.push.apply(shown, pads.list);
         // globe.gl sets each element's z-index by distance, so the label could cover the open card,
         // which says the same thing anyway.
         if (you.passPath && card.hidden) shown.push(you.label);
@@ -475,6 +477,141 @@
         if (sat) cardNow.textContent = (sat.id === 'iss' ? 'The ISS' : sat.name) + ' is above your horizon now';
     }
 
+    // ---- Launch pads: a small rocket at each upcoming launch's pad, the next one labeled ----
+    var HOUR = 3600000;
+    var pads = { upcoming: [], list: [], key: '', next: null };
+
+    // "Falcon 9 Block 5 | Starlink Group 15-25" -> "Falcon 9 · Starlink 15-25", short enough to sit on the globe.
+    function shortLaunchName(name) {
+        var parts = String(name).split(' | ');
+        var rocket = parts[0].replace(/\s+Block\s+\d+\b/i, '');
+        var mission = (parts[1] || '').replace(/\bGroup\s+/i, '');
+        return mission ? rocket + ' · ' + mission : rocket;
+    }
+
+    function hasPad(l) {
+        return typeof l.padLat === 'number' && typeof l.padLon === 'number' && isFinite(l.padLat) && isFinite(l.padLon);
+    }
+
+    function text(tag, className, value) {
+        var n = document.createElement(tag);
+        n.className = className;
+        n.textContent = value;
+        return n;
+    }
+
+    // Rebuilt only when the launches still to come change (one flies, or the data loads), so an open card
+    // isn't closed under the visitor's finger every minute.
+    function updatePads() {
+        var now = Date.now();
+        // Same rule as the Launches card: a launch stays for an hour after T-0, then the next one takes over.
+        var coming = pads.upcoming.filter(function (l) { return Date.parse(l.net) > now - HOUR; });
+        var next = sky.pickNextLaunch(pads.upcoming, now);
+        var key = coming.map(function (l) { return l.name + '@' + l.net; }).join('|');
+        if (key === pads.key) return;
+        pads.key = key;
+        pads.next = next;
+
+        // Several launches can share a pad, so they're grouped by position.
+        var byPad = {};
+        pads.list = [];
+        el.classList.remove('has-pad-card');
+        coming.filter(hasPad).forEach(function (l) {
+            var id = l.padLat.toFixed(3) + ',' + l.padLon.toFixed(3);
+            if (!byPad[id]) {
+                byPad[id] = { lat: l.padLat, lng: l.padLon, alt: 0.002, launches: [] };
+                pads.list.push(byPad[id]);
+            }
+            byPad[id].launches.push(l);
+        });
+        pads.list.forEach(buildPad);
+        updatePadLabel();
+        updateMarkers();
+    }
+
+    function buildPad(pad) {
+        var first = pad.launches[0];
+        pad.isNext = pad.launches.indexOf(pads.next) >= 0;
+        pad.node = document.createElement('div');
+        pad.node.className = 'globe-pad' + (pad.isNext ? ' is-next' : '');
+
+        var pin = document.createElement('button');
+        pin.type = 'button';
+        pin.className = 'globe-pad__pin';
+        pin.setAttribute('aria-expanded', 'false');
+        pin.setAttribute('aria-label', 'Launches from ' + (first.padName || first.location || 'this pad'));
+        pin.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1c2 1.6 3 4 3 6.6V11l1.6 1.6V14L10 13H6l-2.6 1v-1.4L5 11V7.6C5 5 6 2.6 8 1z"/></svg>';
+        pad.node.appendChild(pin);
+
+        if (pad.isNext) {
+            pad.label = text('span', 'globe-pad__label', '');
+            pad.node.appendChild(pad.label);
+        }
+
+        var card = document.createElement('div');
+        card.className = 'globe-pad__card';
+        card.hidden = true;
+        card.appendChild(text('strong', '', first.padName || first.location || 'Launch pad'));
+        if (first.padName && first.location) card.appendChild(text('span', 'globe-pad__where', first.location));
+        pad.launches.forEach(function (l) {
+            card.appendChild(text('span', 'globe-pad__name', l.name));
+            card.appendChild(text('span', 'globe-pad__when',
+                [l.provider, sky.launchWhen(l), sky.launchStatus(l)].filter(Boolean).join(' · ')));
+        });
+        var link = text('a', '', 'See Launches');
+        link.href = '#launches';
+        card.appendChild(link);
+        pad.node.appendChild(card);
+
+        pin.addEventListener('click', function () {
+            var open = card.hidden;
+            // One card at a time, so they don't pile up on top of each other.
+            pads.list.forEach(function (p) { setPadOpen(p, false); });
+            setPadOpen(pad, open);
+        });
+    }
+
+    function setPadOpen(pad, open) {
+        var card = pad.node.querySelector('.globe-pad__card');
+        card.hidden = !open;
+        pad.node.querySelector('button').setAttribute('aria-expanded', String(open));
+        pad.node.classList.toggle('is-open', open);
+        // The next launch's label can sit on top of another pad's card, and the card says more anyway.
+        el.classList.toggle('has-pad-card', pads.list.some(function (p) { return p.node.classList.contains('is-open'); }));
+        if (open) {
+            flipIfCut(pad.node, card, 'is-card-left', 'right');
+            flipIfCut(pad.node, card, 'is-card-up', 'bottom');
+        }
+    }
+
+    // Labels and cards hang right of and below the rocket. Near the globe box's right or bottom edge
+    // (on a phone, much of the globe) they would be cut off, so they hang the other way instead.
+    function flipIfCut(node, box, className, edge) {
+        node.classList.remove(className);
+        var limit = el.getBoundingClientRect()[edge];
+        node.classList.toggle(className, box.getBoundingClientRect()[edge] > limit - 8);
+    }
+
+    // "Falcon 9 · Starlink 15-25 · T−22h 58m", or the date when there's no countdown to show.
+    function updatePadLabel() {
+        var pad = pads.list.filter(function (p) { return p.isNext; })[0];
+        if (!pad) return;
+        var when = sky.launchCountdown(pads.next, Date.now()) || sky.launchWhen(pads.next);
+        // Only touch the text when the minute changes, not on every one-second tick.
+        if (pad.when !== when) {
+            pad.when = when;
+            pad.label.textContent = shortLaunchName(pads.next.name);
+            pad.label.appendChild(text('span', 'when', when));
+        }
+        // The globe turns under the label, so this is checked every tick.
+        if (!pad.node.classList.contains('is-open')) flipIfCut(pad.node, pad.label, 'is-label-left', 'right');
+    }
+
+    sky.launchesReady.then(function (upcoming) {
+        pads.upcoming = upcoming;
+        updatePads();
+    }).catch(function () { /* no launch data: no pads */ });
+
     if (yourSky) yourSky.on(setLocation);
 
     // ---- Aurora fallback: a band of points, used when the shell above can't be built ----
@@ -545,6 +682,7 @@
             centerOnSelected();
         } else if (type === 'tick') {
             if (sky.state.view !== 'globe') return;
+            updatePadLabel();
             updateMarkers();
             if (you.loc) { updateFootprint(); renderPaths(); }
             if (sky.state.following) lookAtSelected(1000);
@@ -552,6 +690,7 @@
             updateSun();
             updateOrbits();
             updatePass();
+            updatePads();
         } else if (type === 'select') {
             updateFootprint();
             updateOrbits();

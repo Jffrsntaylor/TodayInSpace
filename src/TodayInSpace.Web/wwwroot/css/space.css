@@ -705,6 +705,55 @@ a { color: var(--accent); }
     .globe-pass-label .when::before, .map-pass-label .when::before { content: none; }
 }
 
+/* Launch pads on the globe. A zero-size box centered on the pad, with the rocket, label and card hanging off it. */
+.globe-pad { --pad-color: #ff9a76; position: relative; width: 0; height: 0; }
+.globe-pad__pin {
+    position: absolute; left: -7px; top: -7px;
+    width: 14px; height: 14px;
+    padding: 0; border: 0; background: none;
+    color: var(--pad-color); opacity: 0.8;
+    cursor: pointer; pointer-events: auto;
+}
+.globe-pad__pin svg { display: block; width: 100%; height: 100%; fill: currentColor; filter: drop-shadow(0 0 2px #000); }
+.globe-pad__pin:hover, .globe-pad.is-open .globe-pad__pin { opacity: 1; }
+.globe-pad__pin:focus-visible { outline: 2px solid var(--pad-color); outline-offset: 2px; border-radius: 3px; }
+.globe-pad.is-next .globe-pad__pin { left: -9px; top: -9px; width: 18px; height: 18px; opacity: 1; }
+.globe-pad.is-next .globe-pad__pin svg { filter: drop-shadow(0 0 4px var(--pad-color)); }
+.globe-pad__label {
+    position: absolute; left: 12px; top: -8px;
+    font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11px;
+    color: var(--pad-color);
+    text-shadow: 0 1px 4px #000, 0 0 2px #000;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.globe-pad__label .when::before { content: ' · '; }
+.globe-pad__card {
+    position: absolute; left: 14px; top: -6px;
+    display: flex; flex-direction: column; gap: 3px;
+    width: max-content; max-width: 240px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(12, 16, 32, 0.92);
+    font-size: 12px; line-height: 1.35; color: var(--ink-soft);
+    pointer-events: auto;
+}
+.globe-pad__card[hidden] { display: none; }
+.globe-pad.is-label-left .globe-pad__label { left: auto; right: 12px; text-align: right; }
+.globe-pad.is-card-left .globe-pad__card { left: auto; right: 14px; }
+.globe-pad.is-card-up .globe-pad__card { top: auto; bottom: -6px; }
+.has-pad-card .globe-pad__label { display: none; }
+.globe-pad__card strong { font-family: 'Sora', sans-serif; font-size: 13px; color: var(--ink); }
+.globe-pad__where { color: var(--ink-faint); }
+.globe-pad__name { margin-top: 4px; color: var(--ink); font-weight: 600; }
+.globe-pad__card a { margin-top: 4px; color: var(--accent); }
+@media (max-width: 720px) {
+    .globe-pad__label .when { display: block; }
+    .globe-pad__label .when::before { content: none; }
+    .globe-pad__card { max-width: 190px; }
+}
+
 /* 3D globe */
 .sky-globe {
     height: 520px;
