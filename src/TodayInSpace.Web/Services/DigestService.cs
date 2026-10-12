@@ -41,7 +41,8 @@ namespace TodayInSpace.Web.Services
         }
 
         // Reads the most recent digest (the timer function keeps "latest.json" updated).
-        public async Task<DigestModel?> GetLatestAsync()
+        // Virtual so tests can hand in a digest without storage.
+        public virtual async Task<DigestModel?> GetLatestAsync()
         {
             return await ReadDigestAsync("latest.json");
         }

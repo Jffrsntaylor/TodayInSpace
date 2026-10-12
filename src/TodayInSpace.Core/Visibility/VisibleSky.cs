@@ -16,9 +16,19 @@ namespace TodayInSpace.Core.Visibility
         public Darkness? Darkness { get; init; }
         public IReadOnlyList<PlanetTonight> Planets { get; init; } = Array.Empty<PlanetTonight>();
         public MoonTonight? Moon { get; init; }
+
+        // Added for "will I actually see it?". Place and Clouds come from the National Weather Service and are
+        // null outside the US (or if NWS is down). Aurora is null only if it couldn't be worked out at all.
+        public Place? Place { get; init; }
+        public AuroraOutlook? Aurora { get; init; }
+        public CloudOutlook? Clouds { get; init; }
     }
 
-    public record VisiblePass(string Satellite, string Name, SkyPoint Start, SkyPoint Max, SkyPoint End, int DurationSeconds);
+    public record VisiblePass(string Satellite, string Name, SkyPoint Start, SkyPoint Max, SkyPoint End, int DurationSeconds)
+    {
+        // Cloud cover at the highest point of the pass; null without a cloud forecast.
+        public int? CloudPercent { get; init; }
+    }
 
     // Available = false when the satellite's orbit data couldn't be loaded, so it has no predictions at all.
     public record SatelliteVisibility(string Id, string Name, int VisiblePasses, bool AnyPassAbove10, bool Available);
@@ -57,6 +67,24 @@ namespace TodayInSpace.Core.Visibility
                 Darkness = tonight.Darkness,
                 Planets = tonight.Planets,
                 Moon = tonight.Moon,
+            };
+        }
+
+        // Adds the place name, aurora odds and cloud cover to an already computed sky, and puts the cloud cover on
+        // each pass (at its highest point) and each visible planet (at its best time).
+        public static VisibleSkyResponse WithConditions(VisibleSkyResponse sky, Place? place, AuroraOutlook? aurora, SkyCover? cover)
+        {
+            var clouds = cover == null ? null : NwsWeather.Outlook(cover, sky.Darkness, sky.Generated, sky.Generated.AddDays(sky.Days));
+            if (clouds == null)
+                return sky with { Place = place, Aurora = aurora };
+
+            return sky with
+            {
+                Place = place,
+                Aurora = aurora,
+                Clouds = clouds,
+                Passes = sky.Passes.Select(p => p with { CloudPercent = NwsWeather.PercentAt(clouds.Series, p.Max.Time) }).ToList(),
+                Planets = sky.Planets.Select(p => p.Visible ? p with { CloudPercent = NwsWeather.PercentAt(clouds.Series, p.Best.Time) } : p).ToList(),
             };
         }
 

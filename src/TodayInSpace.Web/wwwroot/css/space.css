@@ -399,6 +399,21 @@ a { color: var(--accent); }
 .tonight-note { margin-top: 10px; font-size: 13px; color: var(--ink-soft); }
 .tonight-moon { margin-top: 12px; color: var(--ink-soft); }
 .tonight-moon .planet-name { color: #e6e9f5; margin-right: 10px; }
+/* Aurora odds and tonight's clouds, above the passes. */
+.sky-conditions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.sky-conditions[hidden] { display: none; }
+.cond { display: grid; grid-template-columns: 5.5em 1fr; gap: 14px; align-items: baseline; }
+.cond-label {
+    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+}
+.cond-text { color: var(--ink); }
+.cond-text > div + div { margin-top: 2px; color: var(--ink-soft); }
+.cond abbr.kp { text-decoration: underline dotted; cursor: help; }
+/* A cloud column on pass and planet rows, only when there's a cloud forecast. */
+.sky-cloud { color: var(--ink-soft); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.with-clouds .pass { grid-template-columns: 5.5em 7.5em 1fr 7.5em 4em 3.8em; }
+.with-clouds .planet { grid-template-columns: 5.5em 7em 1fr 11em 9em 3.8em; }
 @media (max-width: 640px) {
     .sky-card { padding: 20px 14px; }
     .sky-where { flex-direction: column; align-items: stretch; }
@@ -423,6 +438,16 @@ a { color: var(--accent); }
     .planet-best { grid-area: best; text-align: right; }
     .planet-where { grid-area: where; }
     .planet-riseset { grid-area: riseset; }
+    .with-clouds .pass {
+        grid-template-columns: 5em 1fr auto auto;
+        grid-template-areas: "sat time time length" "path path height cloud";
+    }
+    .with-clouds .planet {
+        grid-template-columns: 5em 1fr auto auto;
+        grid-template-areas: "name bright bright best" "where where riseset cloud";
+    }
+    .with-clouds .sky-cloud { grid-area: cloud; }
+    .cond { grid-template-columns: 1fr; gap: 2px; }
 }
 
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }

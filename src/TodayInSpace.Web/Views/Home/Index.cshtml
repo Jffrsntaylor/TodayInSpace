@@ -174,11 +174,13 @@
                 </div>
                 <p class="sky-error" id="sky-error" role="alert" hidden></p>
                 <p class="sky-intro" id="sky-intro">Enter a zip code or use your location to see when the ISS, Tiangong and Hubble will be visible from where you are over the next 7 days, plus the planets and Moon tonight.</p>
+                @* Aurora odds and tonight's cloud cover, filled in by visible-passes.js. *@
+                <div class="sky-conditions" id="sky-conditions" hidden></div>
                 <div class="sky-passes" id="sky-passes" aria-live="polite"></div>
                 <p class="sky-help" id="sky-help" hidden>Times in your time zone. Predictions can shift by a minute or two as orbits change.</p>
                 @* Planets and the Moon tonight, filled in by visible-passes.js from the same response. *@
                 <div class="sky-tonight" id="sky-tonight" hidden></div>
-                <div class="source">Orbits: CelesTrak &middot; Planets: Astronomy Engine &middot; Zip locations: U.S. Census Bureau</div>
+                <div class="source">Orbits: CelesTrak &middot; Planets: Astronomy Engine &middot; Aurora: NOAA SWPC &middot; Clouds: National Weather Service &middot; Zip locations: U.S. Census Bureau &middot; Zip names: <a href="https://www.geonames.org/" rel="noopener">GeoNames</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>)</div>
             </div>
         </section>
 

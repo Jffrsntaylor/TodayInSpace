@@ -3,9 +3,11 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TodayInSpace.Core.Visibility;
 using TodayInSpace.Web.Controllers;
+using TodayInSpace.Web.Services;
 using TodayInSpace.Web.Sky;
 
 namespace TodayInSpace.Web.Tests
@@ -53,7 +55,12 @@ namespace TodayInSpace.Web.Tests
             var sky = new SkyDataService(new HttpClient(http), new NoStore(), new NoStore(), new NoStore(),
                 new MemoryCache(new MemoryCacheOptions()), NullLogger<SkyDataService>.Instance, clock);
             var cache = new VisibleSkyCache();
-            return (new VisibleSkyService(sky, cache, clock, NullLogger<VisibleSkyService>.Instance), cache, http);
+            // NWS gets the same TLE text, which isn't JSON, so these tests run without place or clouds.
+            var nws = new NwsWeatherService(new HttpClient(http), new NwsCache(), NullLogger<NwsWeatherService>.Instance);
+            var digests = new DigestService(new ConfigurationBuilder().Build());
+            var service = new VisibleSkyService(sky, nws, digests, new MemoryCache(new MemoryCacheOptions()), cache, clock,
+                NullLogger<VisibleSkyService>.Instance);
+            return (service, cache, http);
         }
 
         private static SkyController Controller() => new(null!)

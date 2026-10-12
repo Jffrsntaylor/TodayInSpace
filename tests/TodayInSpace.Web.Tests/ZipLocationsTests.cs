@@ -80,10 +80,46 @@ namespace TodayInSpace.Web.Tests
             var zips = new ZipLookup().Zips;
 
             Assert.True(zips.Count > 30000);
-            Assert.Equal(new ZipLocation("98501", 46.979, -122.876, false), zips.Find("98501"));
-            Assert.Equal(new ZipLocation("10001", 40.751, -73.997, false), zips.Find("10001"));
+            Assert.Equal(new ZipLocation("98501", 46.979, -122.876, false) { City = "Olympia", State = "WA" }, zips.Find("98501"));
+            Assert.Equal(new ZipLocation("10001", 40.751, -73.997, false) { City = "New York", State = "NY" }, zips.Find("10001"));
+            // Puerto Rico isn't in GeoNames' US file, so it has a location but no name.
             Assert.Equal(new ZipLocation("00601", 18.181, -66.750, false), zips.Find("00601"));
             Assert.True(zips.Find("98599")!.Approximate);
+        }
+
+        // The 5-column format tools/build-zip-data.py writes now: zip,lat,lon,city,state.
+        private const string NamedCsv = "zip,lat,lon,city,state\n00601,18.181,-66.750,,\n98501,46.979,-122.876,Olympia,WA\n98502,47.093,-123.024,Olympia,WA\r\n";
+
+        [Fact]
+        public void Find_ReturnsThePostalName()
+        {
+            // NWS calls this spot Tumwater (the nearest town to its grid point); the zip's own name is Olympia.
+            var location = ZipLocations.Parse(NamedCsv).Find("98501")!;
+
+            Assert.Equal(("Olympia", "WA"), (location.City, location.State));
+            Assert.False(location.Approximate);
+        }
+
+        [Fact]
+        public void Find_WithoutAName_OrApproximate_HasNoName()
+        {
+            var zips = ZipLocations.Parse(NamedCsv);
+
+            Assert.Null(zips.Find("00601")!.City);
+            var approximate = zips.Find("98599")!;
+            Assert.True(approximate.Approximate);
+            Assert.Null(approximate.City);
+            Assert.Null(approximate.State);
+        }
+
+        [Fact]
+        public void Endpoint_IncludesCityAndState()
+        {
+            var ok = Assert.IsType<OkObjectResult>(Controller(NamedCsv).GetZip("98501"));
+            var json = System.Text.Json.JsonSerializer.Serialize(ok.Value,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+            Assert.Equal("""{"zip":"98501","lat":46.979,"lon":-122.876,"approximate":false,"city":"Olympia","state":"WA"}""", json);
         }
     }
 }
