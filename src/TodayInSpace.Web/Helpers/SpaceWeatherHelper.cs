@@ -1,3 +1,5 @@
+using TodayInSpace.Core;
+
 namespace TodayInSpace.Web.Helpers
 {
     // Pure logic for interpreting space-weather values.
@@ -16,7 +18,8 @@ namespace TodayInSpace.Web.Helpers
             return "alert";               // 6-9
         }
 
-        // Short human description of a Kp value.
+        // Short human description of a Kp value. Storms (5+) use the names from NOAA's G-scale,
+        // the same scale the Kp explainer shows, so the card and its legend agree.
         public static string GetKpDescription(int? kp)
         {
             if (kp == null || kp < 0 || kp > 9)
@@ -24,8 +27,7 @@ namespace TodayInSpace.Web.Helpers
 
             if (kp < 3) return "quiet";
             if (kp < 5) return "unsettled";
-            if (kp < 7) return "minor storm";
-            return "severe storm";
+            return Glossary.StormScale.First(level => level.Kp == kp).Name + " storm";
         }
 
         // Maps an aurora-chance label to a severity category.

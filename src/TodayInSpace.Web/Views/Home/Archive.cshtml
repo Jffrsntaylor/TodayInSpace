@@ -147,20 +147,23 @@
                     <div class="section-label">Space Weather</div>
                     <div class="cards">
                         <div class="card @kpClass">
-                            <div class="label">Kp Index</div>
+                            <div class="label"><partial name="_ExplainTerm" model="Glossary.Kp" /></div>
                             <div class="value">@(kp >= 0 ? kp.ToString() : "—")</div>
                             <div class="sub">@kpDesc</div>
                         </div>
+                        <partial name="_Explainer" model="Glossary.Kp" />
                         <div class="card @auroraClass">
-                            <div class="label">Aurora Chance</div>
+                            <div class="label"><partial name="_ExplainTerm" model="Glossary.Aurora" /></div>
                             <div class="value text">@(string.IsNullOrEmpty(aurora) ? "—" : aurora)</div>
                             <div class="sub">@auroraSub</div>
                         </div>
+                        <partial name="_Explainer" model="Glossary.Aurora" />
                         <div class="card info">
-                            <div class="label">Solar Wind</div>
+                            <div class="label"><partial name="_ExplainTerm" model="Glossary.SolarWind" /></div>
                             <div class="value">@(sw.SolarWindSpeed?.ToString() ?? "—")</div>
                             <div class="sub">km/s</div>
                         </div>
+                        <partial name="_Explainer" model="Glossary.SolarWind" />
                     </div>
                 </section>
             }
@@ -223,6 +226,7 @@
 
     </div>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
+    <script src="~/js/explainers.js" asp-append-version="true" defer></script>
     @if (prevDate != null)
     {
         <script src="~/js/archive-nav.js" asp-append-version="true"></script>

@@ -62,6 +62,7 @@
     var showing = $('sky-showing'), place = $('sky-place'), errorBox = $('sky-error');
     var intro = $('sky-intro'), list = $('sky-passes'), help = $('sky-help'), tonightBox = $('sky-tonight');
     var conditionsBox = $('sky-conditions');
+    var kpPanel = $('explain-kp-sky');
 
     // Rebuilt by useTimeZone for each response.
     var timeFmt, dayFmt, keyFmt, zoneName;
@@ -150,6 +151,8 @@
         list.setAttribute('aria-busy', 'true');
         tonightBox.hidden = true;
         conditionsBox.hidden = true;
+        // The Kp explainer belongs to the aurora line that's about to be rebuilt.
+        if (kpPanel) kpPanel.hidden = true;
 
         current = { loc: loc, request: fetchVisible(loc) };
         changeListeners.forEach(function (fn) { try { fn(loc); } catch (e) { console.error(e); } });
@@ -286,10 +289,14 @@
         conditionsBox.hidden = !conditionsBox.childNodes.length;
     }
 
-    function kpAbbr() {
-        var abbr = el('abbr', 'kp', 'Kp');
-        abbr.title = 'Kp measures geomagnetic activity from 0 to 9';
-        return abbr;
+    // "Kp" opens the same explainer as the Space Weather card (the panel is in Index.cshtml; explainers.js toggles it).
+    function kpTerm() {
+        var button = el('button', 'term term-inline', 'Kp');
+        button.type = 'button';
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-controls', 'explain-kp-sky');
+        button.appendChild(el('span', 'sr-only', ' (what’s this?)'));
+        return button;
     }
 
     // "Tonight: unlikely (Kp 3 forecast; you'd need about Kp 5 to see it low in the north)",
@@ -307,7 +314,7 @@
             var title = n.date === today ? 'Tonight' : weekday(n.date);
             if (i === 0) {
                 var first = el('div', null, title + ': ' + words[n.chance] + ' (');
-                first.appendChild(kpAbbr());
+                first.appendChild(kpTerm());
                 first.appendChild(document.createTextNode(' ' + n.kp + ' forecast' + needed(aurora, n, low) + ')'));
                 body.appendChild(first);
             } else {

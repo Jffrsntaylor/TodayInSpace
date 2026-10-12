@@ -42,10 +42,15 @@ namespace TodayInSpace.Web.Tests
 
         [Theory]
         [InlineData(0, "quiet")]
+        [InlineData(1, "quiet")]
         [InlineData(2, "quiet")]
+        [InlineData(3, "unsettled")]
         [InlineData(4, "unsettled")]
-        [InlineData(6, "minor storm")]
-        [InlineData(8, "severe storm")]
+        [InlineData(5, "minor storm")]      // G1
+        [InlineData(6, "moderate storm")]   // G2
+        [InlineData(7, "strong storm")]     // G3
+        [InlineData(8, "severe storm")]     // G4
+        [InlineData(9, "extreme storm")]    // G5
         public void GetKpDescription_ReturnsExpectedText(int kp, string expected)
         {
             Assert.Equal(expected, SpaceWeatherHelper.GetKpDescription(kp));
@@ -55,6 +60,14 @@ namespace TodayInSpace.Web.Tests
         public void GetKpDescription_ReturnsUnavailable_WhenNull()
         {
             Assert.Equal("unavailable", SpaceWeatherHelper.GetKpDescription(null));
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(10)]
+        public void GetKpDescription_ReturnsUnavailable_ForOutOfRangeValues(int kp)
+        {
+            Assert.Equal("unavailable", SpaceWeatherHelper.GetKpDescription(kp));
         }
 
         // ---------- GetAuroraSeverity ----------
