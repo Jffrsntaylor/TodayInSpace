@@ -173,10 +173,12 @@
                     Showing <strong id="sky-place"></strong> &middot; <button type="button" class="sky-change" id="sky-change">Change</button>
                 </div>
                 <p class="sky-error" id="sky-error" role="alert" hidden></p>
-                <p class="sky-intro" id="sky-intro">Enter a zip code or use your location to see when the ISS, Tiangong and Hubble will be visible from where you are over the next 7 days.</p>
+                <p class="sky-intro" id="sky-intro">Enter a zip code or use your location to see when the ISS, Tiangong and Hubble will be visible from where you are over the next 7 days, plus the planets and Moon tonight.</p>
                 <div class="sky-passes" id="sky-passes" aria-live="polite"></div>
                 <p class="sky-help" id="sky-help" hidden>Times in your time zone. Predictions can shift by a minute or two as orbits change.</p>
-                <div class="source">Orbits: CelesTrak &middot; Zip locations: U.S. Census Bureau</div>
+                @* Planets and the Moon tonight, filled in by visible-passes.js from the same response. *@
+                <div class="sky-tonight" id="sky-tonight" hidden></div>
+                <div class="source">Orbits: CelesTrak &middot; Planets: Astronomy Engine &middot; Zip locations: U.S. Census Bureau</div>
             </div>
         </section>
 
