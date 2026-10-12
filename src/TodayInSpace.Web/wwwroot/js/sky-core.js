@@ -205,8 +205,16 @@ window.TISSky = (function () {
     var STATUS_TEXT = { 1: 'Go for launch', 2: 'Date not final', 5: 'On hold', 8: 'To be confirmed' };
     var STATUS_GO = 1;
 
+    // Shared with the globe, which puts the upcoming launches' pads on the map.
+    var launchesData = getJson('/api/sky/launches');
+    var launchesReady = launchesData.then(function (data) {
+        return data && Array.isArray(data.upcoming) ? data.upcoming : [];
+    });
+    // The globe loads later (or never), so mark a failure as handled here; it's not an error worth logging.
+    launchesReady.catch(function () { });
+
     // The card shows whatever half has data: the next launch, the year's count, or both.
-    getJson('/api/sky/launches').then(function (data) {
+    launchesData.then(function (data) {
         var section = $('launches');
         if (!section || !data) return;
         var upcoming = Array.isArray(data.upcoming) ? data.upcoming : [];
@@ -321,39 +329,49 @@ window.TISSky = (function () {
     }
 
     function showNextLaunch(launch) {
-        var t = new Date(launch.net);
-        var precision = launch.precision || '';
         $('launch-name').textContent = launch.name;
         $('launch-where').textContent = [launch.provider, launch.location].filter(Boolean).join(' · ');
 
         var time = $('launch-time');
         time.setAttribute('datetime', launch.net);
-        if (TIMED[precision]) {
-            time.textContent = t.toLocaleString(undefined,
-                { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-        } else if (precision === 'DAY') {
-            // Shown in UTC: the placeholder time is midnight UTC, which is the day before in the Americas.
-            time.textContent = t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-        } else {
-            time.textContent = 'NET ' + t.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-        }
-
-        var status = STATUS_TEXT[launch.statusId] || launch.statusAbbrev || '';
-        if (launch.probability != null) status += (status ? ' · ' : '') + launch.probability + '% weather go';
-        $('launch-status').textContent = status;
+        time.textContent = launchWhen(launch);
+        $('launch-status').textContent = launchStatus(launch);
     }
 
-    // "T−2d 4h", "T−3h 12m", "T−8m"; "Launch window open" for an hour after T-0. Only for a launch that's
-    // Go with a real time: anything else could count down to a placeholder.
+    // The local time when the launch has a real one, otherwise just the day or month it's expected.
+    function launchWhen(launch) {
+        var t = new Date(launch.net);
+        var precision = launch.precision || '';
+        if (TIMED[precision]) {
+            return t.toLocaleString(undefined,
+                { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+        if (precision === 'DAY') {
+            // Shown in UTC: the placeholder time is midnight UTC, which is the day before in the Americas.
+            return t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+        }
+        return 'NET ' + t.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    }
+
+    function launchStatus(launch) {
+        var status = STATUS_TEXT[launch.statusId] || launch.statusAbbrev || '';
+        if (launch.probability != null) status += (status ? ' · ' : '') + launch.probability + '% weather go';
+        return status;
+    }
+
     function updateCountdown(launch) {
         var box = $('launch-countdown');
-        if (launch.statusId !== STATUS_GO || !TIMED[launch.precision]) {
-            box.hidden = true;
-            return;
-        }
-        var ms = Date.parse(launch.net) - Date.now();
-        box.textContent = ms <= 0 ? 'Launch window open' : countdown(ms);
-        box.hidden = false;
+        var text = launchCountdown(launch, Date.now());
+        box.hidden = !text;
+        if (text) box.textContent = text;
+    }
+
+    // "T−2d 4h", "T−3h 12m", "T−8m"; "Launch window open" for an hour after T-0. Null unless the launch is
+    // Go with a real time: anything else could count down to a placeholder.
+    function launchCountdown(launch, now) {
+        if (launch.statusId !== STATUS_GO || !TIMED[launch.precision]) return null;
+        var ms = Date.parse(launch.net) - now;
+        return ms <= 0 ? 'Launch window open' : countdown(ms);
     }
 
     function countdown(ms) {
@@ -581,6 +599,11 @@ window.TISSky = (function () {
         unwrapNear: unwrapNear,
         satsReady: satsReady,
         auroraReady: auroraReady,
+        launchesReady: launchesReady,
+        pickNextLaunch: pickNextLaunch,
+        launchCountdown: launchCountdown,
+        launchWhen: launchWhen,
+        launchStatus: launchStatus,
         loadAurora: loadAurora,
         select: select,
         setFollowing: setFollowing,
