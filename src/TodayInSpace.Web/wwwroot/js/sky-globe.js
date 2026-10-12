@@ -1,6 +1,6 @@
 // 3D globe view for Live Sky (globe.gl / three.js): drag to rotate, scroll or pinch to zoom,
 // click a satellite to select it. Shows ISS, Hubble and Tiangong at true relative altitude with their orbits,
-// the aurora forecast, and sunlight coming from the Sun's real direction.
+// the aurora forecast as a glowing shell, city lights on the night side, and sunlight from the Sun's real direction.
 (function () {
     'use strict';
 
@@ -58,7 +58,185 @@
         }
         sunLight.position.set(p.x, p.y, p.z);
         if (sunLight.target && sunLight.target.position) sunLight.target.position.set(0, 0, 0);
+        // The city-light and aurora shaders read the same direction to decide where it's night.
+        if (sunDir) sunDir.set(p.x, p.y, p.z).normalize();
     }
+
+    // ---- Night side: city lights and the aurora shell ----
+    // globe.gl bundles its own three.js and doesn't expose it, so the few classes we need are borrowed
+    // from objects it has already built: Mesh from the globe, ShaderMaterial from the atmosphere,
+    // Texture from the day map, Vector3 from the sun light.
+    var sunDir = sunLight ? new sunLight.position.constructor(1, 0, 0) : null;
+
+    // Shared GLSL: 1 on the night side, 0 in daylight, fading across a ~13° twilight band
+    // (from the Sun 3° above the horizon to 10° below) so the terminator glows instead of cutting.
+    var NIGHT_GLSL = 'float tisNight(vec3 n, vec3 s) { return 1.0 - smoothstep(-0.17, 0.05, dot(normalize(n), s)); }\n';
+
+    function findGlobeParts() {
+        var mat = globe.globeMaterial(), globeMesh = null, atmosphere = null;
+        globe.scene().traverse(function (o) {
+            if (o.isMesh && o.material === mat) globeMesh = o;
+            if (o.__globeObjType === 'atmosphere') atmosphere = o;
+        });
+        return { mat: mat, mesh: globeMesh, atmosphere: atmosphere };
+    }
+
+    function loadImage(url) {
+        return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.onload = function () { resolve(img); };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    // City lights: keep the globe's own Phong material (so the day side is lit exactly as before) and add
+    // the night texture as emissive light, scaled by how dark it is at that spot.
+    function addCityLights(parts, url) {
+        if (!url || !sunDir || !parts.mat || !parts.mat.map) return;
+        loadImage(url).then(function (img) {
+            var tex = new parts.mat.map.constructor(img);
+            tex.colorSpace = parts.mat.map.colorSpace;
+            tex.anisotropy = parts.mat.map.anisotropy;
+            tex.needsUpdate = true;
+
+            parts.mat.onBeforeCompile = function (shader) {
+                shader.uniforms.tisNightMap = { value: tex };
+                shader.uniforms.tisSunDir = { value: sunDir };
+                shader.vertexShader = 'varying vec3 vTisNormal;\n' + shader.vertexShader.replace(
+                    '#include <defaultnormal_vertex>',
+                    '#include <defaultnormal_vertex>\nvTisNormal = normalize(mat3(modelMatrix) * objectNormal);');
+                shader.fragmentShader = 'uniform sampler2D tisNightMap;\nuniform vec3 tisSunDir;\nvarying vec3 vTisNormal;\n' + NIGHT_GLSL +
+                    shader.fragmentShader.replace('#include <emissivemap_fragment>', [
+                        '#include <emissivemap_fragment>',
+                        '#ifdef USE_MAP',
+                        '  vec3 tisLights = texture2D(tisNightMap, vMapUv).rgb;',
+                        // The Black Marble map also shows moonlit land in dim blue; keep only the actual lights
+                        // so the night side still reads as night, then warm them slightly.
+                        '  float tisLum = dot(tisLights, vec3(0.2126, 0.7152, 0.0722));',
+                        '  tisLights *= smoothstep(0.05, 0.2, tisLum) * vec3(1.0, 0.88, 0.7) * 1.4;',
+                        '  totalEmissiveRadiance += tisLights * tisNight(vTisNormal, tisSunDir);',
+                        '#endif'
+                    ].join('\n'));
+            };
+            parts.mat.needsUpdate = true;
+        }).catch(function (e) { console.warn('Night lights unavailable; globe stays as is.', e); });
+    }
+
+    // Aurora: the OVATION grid painted onto an equirectangular canvas, wrapped on a shell ~100 km up.
+    var AURORA_SCALE = 1 + 100 / EARTH_RADIUS_KM;
+    var auroraShell = null, auroraSmall = null, auroraCanvas = null, auroraTex = null, lastAurora = null;
+
+    // Probability (%) -> [r, g, b, alpha]: soft green when faint, bright green as it strengthens,
+    // and a touch of red/magenta at the top end, like the upper fringes of a strong display.
+    function auroraRgba(p) {
+        var g = Math.min(1, (p - 5) / 25), hi = Math.max(0, Math.min(0.6, (p - 30) / 50));
+        var r = 40 + 70 * g, gr = 200 + 55 * g, b = 120 + 30 * g;
+        r += (255 - r) * hi; gr += (80 - gr) * hi; b += (170 - b) * hi;
+        // Alpha rises steeply so the wide 5–15% fringe is only a haze and the likely core stands out.
+        var a = Math.min(1, (p - 5) / 35);
+        return [r, gr, b, 255 * (0.08 + 0.92 * a * a)];
+    }
+
+    function paintAurora(points) {
+        var w = 360, h = 180;
+        var ctx = auroraSmall.getContext('2d');
+        var img = ctx.createImageData(w, h);
+        (points || []).forEach(function (d) {
+            if (d[2] < 5) return;
+            // OVATION longitudes run 0–359 east of Greenwich; the texture's left edge is 180° W.
+            var x = Math.round(d[0] + 180) % w, y = Math.max(0, Math.min(h - 1, Math.round(90 - d[1])));
+            var c = auroraRgba(d[2]), i = (y * w + x) * 4;
+            img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = c[3];
+        });
+        ctx.putImageData(img, 0, 0);
+
+        // Upscale with a small blur so it reads as a glow, not a grid of 1° pixels.
+        var big = auroraCanvas.getContext('2d');
+        big.clearRect(0, 0, auroraCanvas.width, auroraCanvas.height);
+        if ('filter' in big) big.filter = 'blur(2px)';
+        big.drawImage(auroraSmall, 0, 0, auroraCanvas.width, auroraCanvas.height);
+        auroraTex.needsUpdate = true;
+    }
+
+    function addAuroraShell(parts) {
+        if (!sunDir || !parts.mesh || !parts.atmosphere || !parts.mat.map) return false;
+        auroraSmall = document.createElement('canvas');
+        auroraSmall.width = 360; auroraSmall.height = 180;
+        auroraCanvas = document.createElement('canvas');
+        auroraCanvas.width = 720; auroraCanvas.height = 360;
+        auroraTex = new parts.mat.map.constructor(auroraCanvas);
+
+        var uniforms = { auroraMap: { value: auroraTex }, sunDir: { value: sunDir }, time: { value: 0 } };
+        var material = new parts.atmosphere.material.constructor({
+            uniforms: uniforms,
+            transparent: true,
+            depthWrite: false,
+            blending: 2, // THREE.AdditiveBlending
+            vertexShader: [
+                'varying vec2 vUv;',
+                'varying vec3 vNormalW;',
+                'void main() {',
+                '  vUv = uv;',
+                '  vNormalW = normalize(mat3(modelMatrix) * normal);',
+                '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                '}'
+            ].join('\n'),
+            fragmentShader: 'uniform sampler2D auroraMap;\nuniform vec3 sunDir;\nuniform float time;\nvarying vec2 vUv;\nvarying vec3 vNormalW;\n' + NIGHT_GLSL + [
+                'void main() {',
+                '  vec4 a = texture2D(auroraMap, vUv);',
+                // Two slow waves drifting along longitude at different speeds: a gentle, uneven shimmer.
+                '  float shimmer = 1.0 + 0.2 * sin(time * 0.7 + vUv.x * 70.0) * sin(time * 0.43 + vUv.x * 23.0 + 1.7);',
+                // Faint by day so it doesn't look painted onto the sunlit side.
+                '  float k = mix(0.15, 1.0, tisNight(vNormalW, sunDir)) * shimmer;',
+                '  gl_FragColor = vec4(a.rgb * k, a.a * k);',
+                '}'
+            ].join('\n')
+        });
+
+        // A child of the globe mesh, sharing its sphere, so it inherits the same rotation and texture layout.
+        auroraShell = new parts.mesh.constructor(parts.mesh.geometry, material);
+        auroraShell.scale.setScalar(AURORA_SCALE);
+        // Runs only when the globe actually renders a frame, so a paused or offscreen globe does no work.
+        auroraShell.onBeforeRender = function () {
+            if (!reduceMotion) uniforms.time.value = performance.now() / 1000;
+        };
+        parts.mesh.add(auroraShell);
+        return true;
+    }
+
+    // If either shader fails to compile, go back to the plain globe and the aurora points layer.
+    var renderer = globe.renderer();
+    if (renderer && renderer.debug) {
+        renderer.debug.onShaderError = function () {
+            console.warn('Globe night shaders failed to compile; using the plain globe and aurora points.');
+            renderer.debug.onShaderError = null;
+            var parts = findGlobeParts();
+            if (parts.mat) { parts.mat.onBeforeCompile = function () { }; parts.mat.needsUpdate = true; }
+            if (auroraShell) {
+                auroraShell.parent.remove(auroraShell);
+                auroraShell.material.dispose();
+                auroraTex.dispose();
+                auroraShell = null;
+            }
+            showAurora(lastAurora);
+        };
+    }
+
+    var nightReady = false;
+    globe.onGlobeReady(function () {
+        if (nightReady) return;
+        nightReady = true;
+        var parts = findGlobeParts();
+        try {
+            addCityLights(parts, el.getAttribute('data-night-texture'));
+            addAuroraShell(parts);
+        } catch (e) {
+            console.warn('Globe night layers unavailable; using the plain globe.', e);
+            auroraShell = null;
+        }
+        showAurora(lastAurora);
+    });
 
     // ---- Satellites (HTML markers that follow the globe and hide behind it) ----
     var markers = sky.SATS.map(function (s) {
@@ -163,7 +341,7 @@
         globe.pathsData(paths);
     }
 
-    // ---- Aurora forecast as a glowing band of points ----
+    // ---- Aurora fallback: a band of points, used when the shell above can't be built ----
     function auroraColor(p) {
         if (p >= 50) return '#ff5d8f';
         if (p >= 30) return '#ffd166';
@@ -181,7 +359,16 @@
         .pointsMerge(true);
 
     function showAurora(data) {
-        globe.pointsData(data && data.points ? data.points : []);
+        if (data) lastAurora = data;
+        var points = lastAurora && lastAurora.points ? lastAurora.points : [];
+        // Until the globe is ready we don't know yet whether the shell works, so show nothing rather than flash points.
+        if (!nightReady) return;
+        if (auroraShell) {
+            paintAurora(points);
+            globe.pointsData([]);
+        } else {
+            globe.pointsData(points);
+        }
     }
 
     // ---- Camera: slow auto-rotate until the visitor grabs the globe ----
