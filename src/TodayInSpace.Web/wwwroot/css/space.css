@@ -379,6 +379,26 @@ a { color: var(--accent); }
 .pass-length { text-align: right; font-variant-numeric: tabular-nums; }
 .pass-notes { list-style: none; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
 .sky-help { margin-top: 12px; font-size: 12px; color: var(--ink-faint); font-style: italic; }
+/* Planets and the Moon tonight, under the passes. */
+.sky-tonight { margin-top: 22px; font-size: 14px; color: var(--ink); }
+.sky-tonight[hidden] { display: none; }
+.planet {
+    display: grid;
+    grid-template-columns: 5.5em 7em 1fr 11em 9em;
+    gap: 4px 14px;
+    align-items: baseline;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface);
+}
+.planet-name { font-weight: 700; color: #ffd89b; }
+.planet-bright, .planet-where, .planet-riseset { color: var(--ink-soft); }
+.planet-bright { white-space: nowrap; }
+.planet-best { font-weight: 700; }
+.planet-riseset { text-align: right; }
+.tonight-note { margin-top: 10px; font-size: 13px; color: var(--ink-soft); }
+.tonight-moon { margin-top: 12px; color: var(--ink-soft); }
+.tonight-moon .planet-name { color: #e6e9f5; margin-right: 10px; }
 @media (max-width: 640px) {
     .sky-card { padding: 20px 14px; }
     .sky-where { flex-direction: column; align-items: stretch; }
@@ -393,6 +413,16 @@ a { color: var(--accent); }
     .pass-length { grid-area: length; }
     .pass-path { grid-area: path; }
     .pass-height { grid-area: height; text-align: right; }
+    /* Two lines per planet: name, brightness and best time, then where and rise/set. */
+    .planet {
+        grid-template-columns: 5em 1fr auto;
+        grid-template-areas: "name bright best" "where where riseset";
+    }
+    .planet-name { grid-area: name; }
+    .planet-bright { grid-area: bright; }
+    .planet-best { grid-area: best; text-align: right; }
+    .planet-where { grid-area: where; }
+    .planet-riseset { grid-area: riseset; }
 }
 
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }

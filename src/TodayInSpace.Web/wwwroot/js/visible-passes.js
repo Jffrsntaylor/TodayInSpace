@@ -1,4 +1,5 @@
-// "Your sky this week": when the ISS, Tiangong and Hubble can be seen from the visitor's location.
+// "Your sky this week": when the ISS, Tiangong and Hubble can be seen from the visitor's location,
+// and which planets are up tonight and what the Moon is doing.
 //  - Location is a US zip (looked up by /api/location/zip) or the browser's geolocation
 //  - lat/lon are rounded to 2 decimals (about 1 km) before they leave the browser
 //  - The location is remembered in this browser's localStorage only
@@ -14,7 +15,7 @@
 
     var form = $('sky-where'), zipInput = $('sky-zip'), geoButton = $('sky-geo');
     var showing = $('sky-showing'), place = $('sky-place'), errorBox = $('sky-error');
-    var intro = $('sky-intro'), list = $('sky-passes'), help = $('sky-help');
+    var intro = $('sky-intro'), list = $('sky-passes'), help = $('sky-help'), tonightBox = $('sky-tonight');
 
     var timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
     var dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -58,6 +59,7 @@
         intro.hidden = true;
         list.textContent = 'Working out passes…';
         list.setAttribute('aria-busy', 'true');
+        tonightBox.hidden = true;
 
         fetch('/api/sky/visible?lat=' + loc.lat + '&lon=' + loc.lon)
             .then(function (r) {
@@ -68,6 +70,7 @@
             .catch(function () {
                 list.textContent = '';
                 help.hidden = true;
+                tonightBox.hidden = true;
                 showError('We couldn’t load the passes right now. Please try again in a few minutes.');
             })
             .then(function () { list.removeAttribute('aria-busy'); });
@@ -151,6 +154,98 @@
         if (notes.childNodes.length) list.appendChild(notes);
 
         help.hidden = passes.length === 0;
+        renderTonight(data);
+    }
+
+    var PHASES = {
+        newMoon: 'New moon', waxingCrescent: 'Waxing crescent', firstQuarter: 'First quarter',
+        waxingGibbous: 'Waxing gibbous', fullMoon: 'Full moon', waningGibbous: 'Waning gibbous',
+        lastQuarter: 'Last quarter', waningCrescent: 'Waning crescent'
+    };
+
+    // Magnitude runs backwards: the lower the number, the brighter.
+    function brightness(magnitude) {
+        return magnitude <= -2 ? 'very bright' : magnitude <= 0 ? 'bright' : magnitude <= 2 ? 'easy to see' : 'faint';
+    }
+
+    function where(point) {
+        var words = point.elevation < 20 ? 'low' : point.elevation <= 50 ? 'halfway up' : 'high';
+        return words + ' in the ' + compass(point.azimuth);
+    }
+
+    function at(iso) { return timeFmt.format(new Date(iso)); }
+
+    // A best time right at the start or end of the dark hours reads better as words than as a clock time.
+    // When it was already dark at "generated", the dark hours start then, not at dusk.
+    function bestTime(best, darkness, generated) {
+        var t = Date.parse(best.time), start = Date.parse(darkness.start);
+        if (t - start < 5 * 60000) return start - Date.parse(generated) < 60000 ? 'best now' : 'best at dusk';
+        if (Date.parse(darkness.end) - t < 5 * 60000) return 'best at dawn';
+        return 'best ' + at(best.time);
+    }
+
+    function riseSet(body) {
+        var parts = [];
+        if (body.rise) parts.push('rises ' + at(body.rise));
+        if (body.set) parts.push('sets ' + at(body.set));
+        return parts.join(' · ');
+    }
+
+    function joinNames(names) {
+        return names.length < 3 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
+    function renderTonight(data) {
+        tonightBox.textContent = '';
+        tonightBox.appendChild(el('h3', 'pass-day-title', 'Planets tonight'));
+
+        if (!data.darkness) {
+            tonightBox.appendChild(el('p', 'tonight-note', 'It doesn’t get dark enough tonight to see the planets.'));
+        } else {
+            var planets = data.planets || [];
+            var ul = el('ul', 'pass-list');
+            planets.filter(function (p) { return p.visible; }).forEach(function (p) {
+                var li = el('li', 'planet planet-' + p.id);
+                li.appendChild(el('span', 'planet-name', p.name));
+                li.appendChild(el('span', 'planet-bright', brightness(p.magnitude)));
+                li.appendChild(el('span', 'planet-where', where(p.best)));
+                li.appendChild(el('span', 'planet-best', bestTime(p.best, data.darkness, data.generated)));
+                li.appendChild(el('span', 'planet-riseset', riseSet(p)));
+                ul.appendChild(li);
+            });
+            if (ul.childNodes.length) tonightBox.appendChild(ul);
+
+            // The ones you can't see, one line per reason.
+            var reasons = { nearSun: 'too close to the Sun to see tonight', belowHorizon: 'too low to see while it’s dark' };
+            Object.keys(reasons).forEach(function (reason) {
+                var names = planets.filter(function (p) { return p.reason === reason; })
+                    .map(function (p) { return p.name; });
+                if (names.length) tonightBox.appendChild(el('p', 'tonight-note', joinNames(names) + ': ' + reasons[reason]));
+            });
+        }
+
+        if (data.moon) tonightBox.appendChild(moonLine(data.moon, !!data.darkness));
+        tonightBox.hidden = false;
+    }
+
+    // Without any dark hours, only the phase means anything.
+    function moonLine(moon, hasDarkness) {
+        var p = el('p', 'tonight-moon');
+        p.appendChild(el('span', 'planet-name', 'Moon'));
+        var text = [PHASES[moon.phase] || moon.phase, Math.round(moon.illumination * 100) + '% lit'];
+        var times = riseSet(moon);
+        if (times) text.push(times);
+        else if (hasDarkness) text.push(moon.upDuringDarkness ? 'up all night' : 'not up while it’s dark');
+
+        var line = text.join(' · ');
+        // A bright Moon washes out faint stars and the Milky Way while it's up.
+        if (moon.illumination >= 0.5 && moon.upDuringDarkness) {
+            line += moon.set && !moon.rise ? ' — its light hides faint stars until then'
+                : moon.rise && !moon.set ? ' — its light hides faint stars after that'
+                : ' — its light hides faint stars';
+        }
+        p.appendChild(el('span', null, line));
+        return p;
     }
 
     form.addEventListener('submit', function (e) {

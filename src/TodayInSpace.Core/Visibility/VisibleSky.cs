@@ -9,7 +9,14 @@ namespace TodayInSpace.Core.Visibility
         DateTime Generated,
         int Days,
         IReadOnlyList<VisiblePass> Passes,
-        IReadOnlyList<SatelliteVisibility> Satellites);
+        IReadOnlyList<SatelliteVisibility> Satellites)
+    {
+        // Added for the planets and Moon. They're init properties rather than constructor arguments so the
+        // original fields (and anything already built against them) stay exactly as they were.
+        public Darkness? Darkness { get; init; }
+        public IReadOnlyList<PlanetTonight> Planets { get; init; } = Array.Empty<PlanetTonight>();
+        public MoonTonight? Moon { get; init; }
+    }
 
     public record VisiblePass(string Satellite, string Name, SkyPoint Start, SkyPoint Max, SkyPoint End, int DurationSeconds);
 
@@ -44,7 +51,13 @@ namespace TodayInSpace.Core.Visibility
                 summaries.Add(new SatelliteVisibility(sat.Id, sat.Name, found.Visible.Count, found.AnyPassAbove10, Available: true));
             }
 
-            return new VisibleSkyResponse(lat, lon, now, Days, passes.OrderBy(p => p.Start.Time).ToList(), summaries);
+            var tonight = NightSky.Build(lat, lon, now);
+            return new VisibleSkyResponse(lat, lon, now, Days, passes.OrderBy(p => p.Start.Time).ToList(), summaries)
+            {
+                Darkness = tonight.Darkness,
+                Planets = tonight.Planets,
+                Moon = tonight.Moon,
+            };
         }
 
         // A tenth of a degree is more than a predictor this simple can promise.
