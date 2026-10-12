@@ -16,14 +16,15 @@ Everything Today in Space runs on, described in Bicep so it can be rebuilt or mo
 
 | Resource | Name | Why it exists |
 | --- | --- | --- |
-| Storage account | `todayinspace` | Holds every day's digest and archived image. **Irreplaceable data.** |
+| Resource group | `rg-todayinspace` (West US 2) | Holds everything below, in the company subscription. |
+| Storage account | `tisdatagdv7m` | Holds every day's digest and archived image. **Irreplaceable data.** Also the function's runtime storage (state and the `tis-func-content` share). |
 | Blob container | `digests` | One JSON file per day (`YYYY-MM-DD.json`) plus `latest.json`. Private. |
 | Blob container | `images` | Copies of each day's APOD image, served through the site's `/images/{name}` route. Private. |
-| App Service plan | `webPlanName` | Hosts the web app (Windows). |
-| Web app | `tis-app-east` | The ASP.NET Core MVC site. |
-| Consumption plan (Y1) | `functionPlanName` | Pay-per-run hosting for the function app. |
-| Function app | `tis-function` | Fetches APOD and NOAA data twice a day and writes it to storage. |
-| Function runtime storage | `functionStorageAccountName` | Where the Functions host keeps its state and the deployed code (content share). Defaults to `todayinspace`. |
+| App Service plan | `tis-web-plan` | Hosts the web app (Linux, B1, Always On). |
+| Web app | `tis-web-gdv7m` | The ASP.NET Core MVC site, at `space.evergreensystemswa.com`. |
+| Custom domain + certificate | `space.evergreensystemswa.com` | Set up by hand in the portal, not in Bicep (see [Gotchas we hit](#gotchas-we-hit)). A free App Service Managed Certificate, bound with SNI. |
+| Consumption plan (Y1) | `tis-func-plan` | Pay-per-run hosting for the function app (Windows). |
+| Function app | `tis-func-gdv7m` | Fetches APOD and NOAA data on a timer and writes it to storage. |
 | Log Analytics + App Insights | `*-logs`, `*-insights` | Only created when `appInsights = true`. The workspace has a daily cap (`dailyQuotaGb`, 0.1 GB) so it stays in the free tier. |
 
 ## Values to confirm before the first run
@@ -155,3 +156,31 @@ there first, and use `export NAME=value` instead of `$env:NAME = "value"`.
     azcopy sync "https://todayinspace.blob.core.windows.net/images?<source-SAS>" "https://tisdatagdv7m.blob.core.windows.net/images?<dest-SAS>" --recursive
     ```
     `sync` only copies what's new or changed, and it never deletes anything in the new account.
+
+### Gotchas we hit
+
+Things that tripped us up during the move, so the next one goes faster.
+
+- **SAS tokens.** The portal gives you the SAS without the leading `?`, so add it yourself after the container
+  URL. The destination SAS needs Write, Add and Create permissions, not just Read.
+- **"Download publish profile" does nothing.** Get it from the CLI instead:
+  ```bash
+  az webapp deployment list-publishing-profiles --resource-group rg-todayinspace --name tis-web-gdv7m --xml
+  ```
+- **"Publish profile is invalid for app-name"** wasn't the profile at all. The `AZURE_WEBAPP_NAME` variable still
+  had the old name, plus a trailing newline. Re-running the workflow with debug logging turned on shows the
+  values it actually uses.
+- **Linux web app deploys** with a publish profile need the app setting `WEBSITE_WEBDEPLOY_USE_SCM = true`.
+  `main.bicep` sets it on Linux.
+- **Portal Test/Run needs CORS.** The function app has to allow `https://portal.azure.com`, which `main.bicep`
+  now sets. Without the portal, you can also run a timer function directly with the master key (function app,
+  then App keys, then `_master`):
+  ```bash
+  curl -X POST "https://tis-func-gdv7m.azurewebsites.net/admin/functions/RefreshPeopleInSpace"     -H "x-functions-key: <master-key>" -H "Content-Type: application/json" -d "{}"
+  ```
+  A `202 Accepted` means it started.
+- **Custom domain.** In Cloudflare, add a CNAME `space` pointing to `tis-web-gdv7m.azurewebsites.net`, set to
+  **DNS only (grey cloud)** so App Service can validate it, and a TXT record `asuid.space` with the web app's
+  Custom Domain Verification ID. Then add the domain on the web app, create a free App Service Managed
+  Certificate for it, and bind it with SNI SSL. This lives outside Bicep on purpose: the hostname binding and
+  certificate are separate resources, so redeploying the template leaves them alone.

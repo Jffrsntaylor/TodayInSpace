@@ -163,6 +163,12 @@ var functionAppInsightsSettings = empty(functionAppInsightsConnectionString) ? [
 
 var webIsLinux = webOs == 'linux'
 
+// azure/webapps-deploy with a publish profile needs this on Linux, or the deploy fails. Windows doesn't use it,
+// so the Windows site's settings stay exactly as before.
+var webLinuxDeploySettings = webIsLinux ? [
+  { name: 'WEBSITE_WEBDEPLOY_USE_SCM', value: 'true' }
+] : []
+
 // Windows picks the .NET version through netFrameworkVersion plus the CURRENT_STACK metadata;
 // Linux uses linuxFxVersion instead. Only one set is sent, so the Windows site deploys exactly as before.
 var webRuntimeConfig = webIsLinux
@@ -199,7 +205,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'Storage__ConnectionString', value: storageConnectionString }
         { name: 'Storage__ContainerName', value: digestsContainerName }
         { name: 'Storage__ImagesContainerName', value: imagesContainerName }
-      ], webAppInsightsSettings)
+      ], webLinuxDeploySettings, webAppInsightsSettings)
     })
   }
 }
@@ -231,6 +237,10 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
       netFrameworkVersion: 'v10.0'
       minTlsVersion: '1.2'
       ftpsState: 'Disabled' // VERIFY: may change live behavior if FTP deploys were ever used
+      // The portal's Code + Test, then Test/Run, calls the function from the browser, so it needs CORS.
+      cors: {
+        allowedOrigins: ['https://portal.azure.com']
+      }
       appSettings: concat([
         { name: 'AzureWebJobsStorage', value: functionStorageConnectionString }
         // Windows Consumption apps keep their deployed code in this Azure Files share.
