@@ -44,6 +44,11 @@ builder.Services.AddHttpClient<NwsWeatherService>(client =>
 }).RemoveAllLoggers();
 builder.Services.AddScoped<VisibleSkyService>();
 
+// The Earth snapshot PNG for widgets and link previews. The two world maps are decoded once, on first use.
+builder.Services.AddSingleton(sp => EarthSnapshotRenderer.FromWebRoot(sp.GetRequiredService<IWebHostEnvironment>().WebRootFileProvider));
+builder.Services.AddSingleton<EarthSnapshotCache>();
+builder.Services.AddScoped<EarthSnapshotService>();
+
 // /healthz: can we read storage, and did the daily function publish recently?
 builder.Services.AddHealthChecks()
     .AddCheck<StorageHealthCheck>("storage")
