@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TodayInSpace.Web.Health;
@@ -55,6 +56,19 @@ builder.Services.AddHttpClient<NwsWeatherService>(client =>
 }).RemoveAllLoggers();
 builder.Services.AddScoped<VisibleSkyService>();
 
+// The location endpoints are limited per visitor IP (see LocationRateLimit).
+builder.Services.AddRateLimiter(LocationRateLimit.Configure);
+
+// App Service's front end connects to us, so the visitor's IP arrives in X-Forwarded-For. Its proxy addresses
+// aren't fixed, so trust only the last hop (the one App Service appended); anything a client adds sits further left.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // The Earth snapshot PNG for widgets and link previews. The two world maps are decoded once, on first use.
 builder.Services.AddSingleton(sp => EarthSnapshotRenderer.FromWebRoot(sp.GetRequiredService<IWebHostEnvironment>().WebRootFileProvider));
 builder.Services.AddSingleton<EarthSnapshotCache>();
@@ -72,6 +86,9 @@ if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_
 
 var app = builder.Build();
 
+// First, so everything after it sees the visitor's IP rather than App Service's front end.
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -84,6 +101,7 @@ app.UseSecurityHeaders();
 app.UseHttpsRedirection();
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/sky/active-satellites"), branch => branch.UseResponseCompression());
 app.UseRouting();
+app.UseRateLimiter();
 
 app.MapStaticAssets();
 

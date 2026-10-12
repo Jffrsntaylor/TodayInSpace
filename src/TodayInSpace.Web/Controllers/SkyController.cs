@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TodayInSpace.Core.Snapshot;
 using TodayInSpace.Core.Visibility;
+using TodayInSpace.Web.Security;
 using TodayInSpace.Web.Sky;
 
 namespace TodayInSpace.Web.Controllers
@@ -36,6 +38,7 @@ namespace TodayInSpace.Web.Controllers
         // Visible ISS, Tiangong and Hubble passes for the next 7 days. Takes lat/lon rather than a zip so an app
         // with GPS can call it directly. The service is injected here so the other endpoints don't build it.
         [HttpGet("visible")]
+        [EnableRateLimiting(LocationRateLimit.PolicyName)]
         public async Task<IActionResult> GetVisible([FromQuery] double? lat, [FromQuery] double? lon, [FromServices] VisibleSkyService visible)
         {
             if (!SkyLocation.IsValid(lat, lon))
