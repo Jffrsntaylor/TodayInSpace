@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TodayInSpace.Core.Visibility;
+using TodayInSpace.Web.Security;
 using TodayInSpace.Web.Sky;
 
 namespace TodayInSpace.Web.Controllers
@@ -19,6 +21,7 @@ namespace TodayInSpace.Web.Controllers
 
         // GET /api/location/zip/98501
         [HttpGet("zip/{zip}")]
+        [EnableRateLimiting(LocationRateLimit.PolicyName)]
         public IActionResult GetZip(string zip)
         {
             if (!ZipLocations.IsValidZip(zip))

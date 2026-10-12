@@ -11,6 +11,8 @@
 
     var STORAGE_KEY = 'tis.location';
     var COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    // Shown when the server's per-visitor limit on location lookups (30 a minute) says no.
+    var TOO_MANY = 'Too many lookups — try again in a minute.';
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -50,6 +52,7 @@
 
     function fetchVisible(loc) {
         return fetch('/api/sky/visible?lat=' + loc.lat + '&lon=' + loc.lon).then(function (r) {
+            if (r.status === 429) throw new Error('busy');
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         });
@@ -158,12 +161,13 @@
         changeListeners.forEach(function (fn) { try { fn(loc); } catch (e) { console.error(e); } });
         current.request
             .then(function (data) { render(data, loc); })
-            .catch(function () {
+            .catch(function (err) {
                 list.textContent = '';
                 help.hidden = true;
                 tonightBox.hidden = true;
                 conditionsBox.hidden = true;
-                showError('We couldn’t load the passes right now. Please try again in a few minutes.');
+                showError(err.message === 'busy' ? TOO_MANY
+                    : 'We couldn’t load the passes right now. Please try again in a few minutes.');
             })
             .then(function () { list.removeAttribute('aria-busy'); });
     }
@@ -452,13 +456,14 @@
         fetch('/api/location/zip/' + zip)
             .then(function (r) {
                 if (r.status === 404 || r.status === 400) throw new Error('unknown');
+                if (r.status === 429) throw new Error('busy');
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
             })
             .then(function (z) { useLocation(z.lat, z.lon, z.zip, z.city && z.state ? z.city + ', ' + z.state : null); })
             .catch(function (err) {
-                showError(err.message === 'unknown'
-                    ? 'We couldn’t find that zip code.'
+                showError(err.message === 'unknown' ? 'We couldn’t find that zip code.'
+                    : err.message === 'busy' ? TOO_MANY
                     : 'We couldn’t look up that zip code right now. Please try again.');
             });
     });
