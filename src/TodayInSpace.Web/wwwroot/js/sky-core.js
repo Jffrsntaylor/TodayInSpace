@@ -67,6 +67,35 @@ window.TISSky = (function () {
         return pts;
     }
 
+    var EARTH_RADIUS_KM = 6371;
+
+    // A satellite's visibility footprint: how far from the point under it (as a central angle, degrees)
+    // it's still at least minElevation degrees above the horizon. For the ISS at ~420 km and 10°, ~12.5°.
+    function footprintRadius(altKm, minElevation) {
+        var e = rad(minElevation);
+        return deg(Math.acos(EARTH_RADIUS_KM * Math.cos(e) / (EARTH_RADIUS_KM + altKm)) - e);
+    }
+
+    // Great-circle angle (degrees) between two points, by the haversine formula (stable for short distances).
+    function angleBetween(lat1, lon1, lat2, lon2) {
+        var a = Math.pow(Math.sin(rad(lat2 - lat1) / 2), 2) +
+            Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.pow(Math.sin(rad(lon2 - lon1) / 2), 2);
+        return deg(2 * Math.asin(Math.min(1, Math.sqrt(a))));
+    }
+
+    // A closed circle of `steps` + 1 points, radiusDeg (central angle) around a point on the sphere,
+    // with longitudes kept continuous near the center's so it draws across the 180th meridian.
+    function circle(lat, lon, radiusDeg, steps) {
+        var pts = [], phi = rad(lat), r = rad(radiusDeg);
+        for (var i = 0; i <= steps; i++) {
+            var b = 2 * Math.PI * i / steps;
+            var pLat = Math.asin(Math.sin(phi) * Math.cos(r) + Math.cos(phi) * Math.sin(r) * Math.cos(b));
+            var dLon = Math.atan2(Math.sin(b) * Math.sin(r) * Math.cos(phi), Math.cos(r) - Math.sin(phi) * Math.sin(pLat));
+            pts.push({ lat: deg(pLat), lon: unwrapNear(lon + deg(dLon), lon) });
+        }
+        return pts;
+    }
+
     // Low-precision solar position (fraction of a degree): mean anomaly -> ecliptic longitude
     // -> declination / right ascension, then subtract sidereal time for the subsolar longitude.
     function subsolarPoint(date) {
@@ -546,6 +575,9 @@ window.TISSky = (function () {
         periodMinutes: periodMinutes,
         track: track,
         subsolarPoint: subsolarPoint,
+        footprintRadius: footprintRadius,
+        angleBetween: angleBetween,
+        circle: circle,
         unwrapNear: unwrapNear,
         satsReady: satsReady,
         auroraReady: auroraReady,

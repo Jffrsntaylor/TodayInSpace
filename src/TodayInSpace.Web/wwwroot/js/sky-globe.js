@@ -1,6 +1,8 @@
 // 3D globe view for Live Sky (globe.gl / three.js): drag to rotate, scroll or pinch to zoom,
 // click a satellite to select it. Shows ISS, Hubble and Tiangong at true relative altitude with their orbits,
 // the aurora forecast as a glowing shell, city lights on the night side, and sunlight from the Sun's real direction.
+// With a location saved in "Your sky", also a pin there, your next visible ISS pass drawn in space, and the
+// selected satellite's footprint: where on Earth it's at least 10° above the horizon right now.
 (function () {
     'use strict';
 
@@ -272,6 +274,10 @@
             m.node.classList.toggle('is-selected', m.id === sky.state.selected);
             shown.push(m);
         });
+        if (you.loc) shown.push(you.pin);
+        // globe.gl sets each element's z-index by distance, so the label could cover the open card,
+        // which says the same thing anyway.
+        if (you.passPath && card.hidden) shown.push(you.label);
         globe.htmlElementsData(shown);
     }
 
@@ -309,8 +315,10 @@
         return 'rgb(' + c.join(',') + ')';
     }
 
+    var orbitPaths = [];
+
     function updateOrbits() {
-        var paths = [];
+        var paths = orbitPaths = [];
         sky.SATS.forEach(function (s) {
             if (!sky.hasSat(s.id)) return;
             var period = sky.periodMinutes(s.id);
@@ -338,8 +346,136 @@
                 });
             }
         });
+        renderPaths();
+    }
+
+    // The orbit objects are kept between calls, so the once-a-second footprint update doesn't recompute them.
+    function renderPaths() {
+        var paths = orbitPaths.slice();
+        if (you.passPath) paths.push(you.passPath);
+        if (you.footprint) paths.push(you.footprint);
         globe.pathsData(paths);
     }
+
+    // ---- Your location (saved in "Your sky"): a pin, your next ISS pass, and the selected satellite's footprint ----
+    var yourSky = window.TISYourSky;
+    var PASS_COLOR = '#fff3c4', MIN_ELEVATION = 10;
+    var you = { loc: null, pass: null, passPath: null, footprint: null };
+
+    you.pin = { node: document.createElement('div'), lat: 0, lng: 0, alt: 0.002 };
+    you.pin.node.className = 'globe-you';
+    you.pin.node.innerHTML =
+        '<button type="button" class="globe-you__pin" aria-expanded="false"><span class="globe-you__ring"></span><span class="globe-you__dot"></span></button>' +
+        '<div class="globe-you__card" hidden><strong class="globe-you__title"></strong><span class="globe-you__pass"></span>' +
+        '<span class="globe-you__now" hidden></span><a href="#your-sky">See your sky</a></div>';
+    var pinButton = you.pin.node.querySelector('button');
+    var card = you.pin.node.querySelector('.globe-you__card');
+    var cardPass = card.querySelector('.globe-you__pass'), cardNow = card.querySelector('.globe-you__now');
+    pinButton.addEventListener('click', function () {
+        card.hidden = !card.hidden;
+        pinButton.setAttribute('aria-expanded', String(!card.hidden));
+        updateMarkers();
+    });
+
+    you.label = { node: document.createElement('div'), lat: 0, lng: 0, alt: 0 };
+    // globe.gl centers each element on its point; a zero-size box with the text hanging off it puts the
+    // text beside the point instead of on top of the arc.
+    you.label.node.className = 'globe-pass-label';
+    you.label.node.appendChild(document.createElement('span'));
+
+    // "Your next ISS pass · Tue 6:43 AM", with the time in its own span so it can drop to a second line on phones.
+    function setPassLabel(node, pass) {
+        node.textContent = 'Your next ISS pass';
+        var when = document.createElement('span');
+        when.className = 'when';
+        when.textContent = pass.when;
+        node.appendChild(when);
+    }
+
+    function setLocation(loc) {
+        you.loc = loc;
+        you.pass = null;
+        you.passPath = null;
+        card.hidden = true;
+        pinButton.setAttribute('aria-expanded', 'false');
+        if (loc) {
+            you.pin.lat = loc.lat;
+            you.pin.lng = loc.lon;
+            var title = /^\d{5}$/.test(loc.label) ? 'Your location (' + loc.label + ')' : 'Your location';
+            card.querySelector('.globe-you__title').textContent = title;
+            pinButton.setAttribute('aria-label', title);
+            cardPass.textContent = '';
+            updatePass();
+        }
+        updateFootprint();
+        updateMarkers();
+        renderPaths();
+    }
+
+    // Looked up again every minute (from the data "Your sky" already has), so it moves on once a pass is over.
+    function updatePass() {
+        if (!you.loc) return;
+        var loc = you.loc;
+        yourSky.nextPass('iss').then(function (pass) {
+            if (you.loc !== loc) return;
+            you.pass = pass;
+            cardPass.textContent = pass ? 'Your next ISS pass · ' + pass.when : 'No visible ISS passes in the next few days';
+            drawPass();
+        }).catch(function () {
+            cardPass.textContent = 'ISS passes aren’t available right now';
+        });
+    }
+
+    // The ISS's track during the visible part of the pass, every 10 s, from the TLE the globe already has.
+    function drawPass() {
+        var pass = you.pass, now = Date.now();
+        var pts = pass && sky.hasSat('iss')
+            ? sky.track('iss', (pass.start - now) / 60000, (pass.end - now) / 60000, 10, you.loc.lon) : [];
+        you.passPath = pts.length > 1 ? {
+            pts: pts,
+            color: [shade(PASS_COLOR, 0.6), shade(PASS_COLOR, 1), shade(PASS_COLOR, 0.6)],
+            stroke: 3.5
+        } : null;
+        if (you.passPath) {
+            // At the end of the pass. Both ends are about as far from the pin (each is 10° above your horizon),
+            // and the middle is the closest point to it, where a label would cover the pin.
+            var end = pts[pts.length - 1];
+            you.label.lat = end.lat;
+            you.label.lng = end.lon;
+            you.label.alt = end.alt / EARTH_RADIUS_KM;
+            setPassLabel(you.label.node.firstChild, pass);
+        }
+        updateMarkers();
+        renderPaths();
+    }
+
+    // A thin ring on the ground around the selected satellite. Only drawn when there's a pin to compare it with.
+    function updateFootprint() {
+        var p = you.loc ? sky.position(sky.state.selected, new Date()) : null;
+        if (!p) {
+            you.footprint = null;
+            setInside(null);
+            return;
+        }
+        var radius = sky.footprintRadius(p.alt, MIN_ELEVATION);
+        var sat = sky.SATS.filter(function (s) { return s.id === sky.state.selected; })[0];
+        you.footprint = {
+            // A few km up so the ring doesn't flicker into the globe's surface.
+            pts: sky.circle(p.lat, p.lon, radius, 90).map(function (q) { return { lat: q.lat, lon: q.lon, alt: 8 }; }),
+            color: shade(sat.color, 0.55),
+            stroke: 1.2
+        };
+        setInside(sky.angleBetween(p.lat, p.lon, you.loc.lat, you.loc.lon) <= radius ? sat : null);
+    }
+
+    // sat is the satellite whose footprint covers the pin, or null.
+    function setInside(sat) {
+        you.pin.node.classList.toggle('is-inside', !!sat);
+        cardNow.hidden = !sat;
+        if (sat) cardNow.textContent = (sat.id === 'iss' ? 'The ISS' : sat.name) + ' is above your horizon now';
+    }
+
+    if (yourSky) yourSky.on(setLocation);
 
     // ---- Aurora fallback: a band of points, used when the shell above can't be built ----
     function auroraColor(p) {
@@ -404,17 +540,20 @@
     sky.on(function (type) {
         if (type === 'ready') {
             updateSun();
-            updateMarkers();
+            setLocation(yourSky ? yourSky.location() : null);
             updateOrbits();
             centerOnSelected();
         } else if (type === 'tick') {
             if (sky.state.view !== 'globe') return;
             updateMarkers();
+            if (you.loc) { updateFootprint(); renderPaths(); }
             if (sky.state.following) lookAtSelected(1000);
         } else if (type === 'minute') {
             updateSun();
             updateOrbits();
+            updatePass();
         } else if (type === 'select') {
+            updateFootprint();
             updateOrbits();
             updateMarkers();
             if (sky.state.view === 'globe') {
