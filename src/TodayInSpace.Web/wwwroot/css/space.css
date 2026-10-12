@@ -86,6 +86,88 @@ a { color: var(--accent); }
     -webkit-text-fill-color: transparent;
 }
 .masthead .date { margin-top: 12px; color: var(--ink-faint); font-size: 15px; font-weight: 500; }
+/* Back to top focuses the masthead; it isn't a control, so no focus ring. */
+.masthead:focus { outline: none; }
+
+/* ---- Section nav ----
+   Sticks under the top edge while scrolling. The z-index has to clear Leaflet's panes (400-1000),
+   which share .wrap's stacking context. */
+.section-nav {
+    position: sticky;
+    top: 8px;
+    z-index: 1100;
+    margin-top: 16px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(8, 11, 24, 0.72);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+.section-nav ul {
+    list-style: none;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-radius: 999px;
+}
+.section-nav ul::-webkit-scrollbar { display: none; }
+/* Centers the chips when they fit. Unlike justify-content: center, the auto margins shrink to
+   nothing when the row overflows, so the first chip can't get cut off on the left. */
+.section-nav ul::before, .section-nav ul::after { content: ""; margin: auto; }
+/* Fade whichever edge has more chips past it. section-nav.js sets these when the row overflows. */
+.section-nav ul.more-right { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+.section-nav ul.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%); mask-image: linear-gradient(90deg, transparent, #000 15%); }
+.section-nav ul.more-left.more-right {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+.section-nav li { flex: none; }
+.section-nav li[hidden] { display: none; }
+.section-nav a {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.section-nav a:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.section-nav a[aria-current="true"] { background: var(--accent); color: #0b0e1c; }
+.section-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Land headings just below the sticky bar: 8px gap + 46px bar + 8px breathing room. */
+.wrap > section[id] { scroll-margin-top: 62px; }
+
+/* Floating back-to-top button. Kept clear of the iOS home bar; section-nav.js also hides it
+   while it would sit on top of the Live Sky panel. */
+.to-top {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    background: rgba(8, 11, 24, 0.8);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: var(--ink);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: opacity .2s ease, visibility .2s;
+}
+.to-top:hover { background: color-mix(in srgb, var(--accent) 30%, rgba(8, 11, 24, 0.8)); }
+.to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.to-top.tucked { opacity: 0; visibility: hidden; }
 
 /* ---- Section labels ---- */
 .section-label {

@@ -48,11 +48,33 @@
     <canvas id="starfield" aria-hidden="true"></canvas>
     <div class="wrap">
 
-        <header class="masthead">
+        @* Back to top moves focus here, so keyboard users start over from the top too. *@
+        <header class="masthead" id="top" tabindex="-1">
             <div class="eyebrow">Daily Digest</div>
             <h1>Today in Space</h1>
             <div class="date">@(string.IsNullOrEmpty(prettyDate) ? "Astronomy &amp; space-weather" : prettyDate)</div>
         </header>
+
+        @* Sticky jump bar. Chips for sections the server didn't render are left out; section-nav.js hides
+           and shows the rest as sky-core.js fills in (or gives up on) People, Launches and Satellites.
+           Real links, so it still works without JS and links like /#launches can be shared. *@
+        <nav class="section-nav" aria-label="Sections">
+            <ul>
+                @if (Model?.Apod != null)
+                {
+                    <li><a href="#apod">Picture</a></li>
+                }
+                @if (sw != null)
+                {
+                    <li><a href="#space-weather">Space Weather</a></li>
+                }
+                <li><a href="#your-sky">Your Sky</a></li>
+                <li hidden><a href="#people">People</a></li>
+                <li hidden><a href="#launches">Launches</a></li>
+                <li hidden><a href="#satellites">Satellites</a></li>
+                <li><a href="#live-sky">Live Sky</a></li>
+            </ul>
+        </nav>
 
         @if (Model?.Apod == null && sw == null)
         {
@@ -64,7 +86,7 @@
         {
             @if (Model?.Apod != null)
             {
-                <section class="apod">
+                <section id="apod" class="apod">
                     <div class="section-label">Astronomy Picture of the Day</div>
                     @{
                         var displaySrc = ApodImageHelper.GetDisplayUrl(Model.Apod);
@@ -113,7 +135,7 @@
 
             @if (sw != null)
             {
-                <section>
+                <section id="space-weather">
                     <div class="section-label">Space Weather</div>
                     <div class="cards">
                         <div class="card @kpClass">
@@ -248,7 +270,7 @@
         </section>
 
         @* sky-loader.js reads these to load the globe and map libraries only when they're needed. *@
-        <section class="sky"
+        <section id="live-sky" class="sky"
                  data-globe-lib="@Url.Content("~/lib/globe.gl/globe.gl.min.js")"
                  data-globe-src="@Versioned("~/js/sky-globe.js")"
                  data-leaflet-css="@Url.Content("~/lib/leaflet/leaflet.css")"
@@ -301,10 +323,12 @@
         </footer>
 
     </div>
+    <button type="button" class="to-top" id="to-top" aria-label="Back to top" hidden>&uarr;</button>
     <script src="~/lib/satellite.js/satellite.min.js"></script>
     <script src="~/js/sky-core.js" asp-append-version="true"></script>
     <script src="~/js/sky-loader.js" asp-append-version="true"></script>
     <script src="~/js/visible-passes.js" asp-append-version="true"></script>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
+    <script src="~/js/section-nav.js" asp-append-version="true" defer></script>
 </body>
 </html>
