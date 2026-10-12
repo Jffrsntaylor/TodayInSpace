@@ -1,5 +1,7 @@
 // Flat map view for Live Sky (Leaflet): satellites and their ground tracks, NOAA's aurora
 // forecast, and the day/night terminator. Shares data and state with the globe via TISSky.
+// With a location saved in "Your sky", also a pin there, your next visible ISS pass, and the selected
+// satellite's footprint, the same as on the globe.
 (function () {
     'use strict';
 
@@ -9,8 +11,10 @@
 
     var map = null;
     var satLayers = {};
-    var nightLayer, auroraLayer, canvas;
+    var nightLayer, auroraLayer, canvas, layersControl;
     var lastAurora = null;
+    var yourSky = window.TISYourSky;
+    var you = { loc: null, pass: null, layer: null, marker: null, passLine: null, passLabel: null, footprint: null, card: null };
 
     function auroraColor(p) {
         if (p >= 50) return '#ff5d8f';
@@ -62,9 +66,14 @@
         });
         overlays['Aurora forecast'] = auroraLayer;
         overlays['Night side'] = nightLayer;
-        L.control.layers(null, overlays, { position: 'topright' }).addTo(map);
+        layersControl = L.control.layers(null, overlays, { position: 'topright' }).addTo(map);
+        if (yourSky) initYou();
 
-        map.on('moveend', function () { if (!sky.state.following) updateTracks(); });
+        map.on('moveend', function () {
+            if (sky.state.following) return;
+            updateTracks();
+            if (you.pass) drawPass();
+        });
         map.on('dragstart', function () { if (sky.state.following) sky.setFollowing(false); });
 
         var p = sky.position(sky.state.selected, new Date());
@@ -74,6 +83,108 @@
         updateTracks();
         updateMarkers();
         if (lastAurora) drawAurora(lastAurora);
+        if (yourSky) setLocation(yourSky.location());
+    }
+
+    // ---- Your location: pin, next ISS pass, and the selected satellite's footprint ----
+    var MIN_ELEVATION = 10, METERS_PER_DEGREE = 6371000 * Math.PI / 180;
+
+    function initYou() {
+        you.card = document.createElement('div');
+        you.card.className = 'map-you-card';
+        you.card.innerHTML = '<strong></strong><span class="pass"></span><span class="now" hidden></span><a href="#your-sky">See your sky</a>';
+        you.marker = L.marker([0, 0], {
+            icon: L.divIcon({
+                className: 'map-you',
+                html: '<span class="map-you__ring"></span><span class="map-you__dot"></span>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            }),
+            keyboard: true
+        }).bindPopup(you.card, { className: 'map-you-popup', closeButton: false });
+        you.passLine = L.polyline([], { renderer: canvas, color: '#fff3c4', weight: 3.5, opacity: 0.95, interactive: false });
+        // A zero-size marker at the end of the pass, with the text hanging off to the right, so it doesn't cover the pin.
+        var label = document.createElement('span');
+        you.passLabel = L.marker([0, 0], {
+            icon: L.divIcon({ className: 'map-pass-label', html: label, iconSize: [0, 0] }),
+            interactive: false,
+            keyboard: false
+        });
+        you.footprint = L.circle([0, 0], { radius: 1, weight: 1.2, opacity: 0.7, fill: false, interactive: false });
+        you.layer = L.layerGroup().addTo(map);
+    }
+
+    function setLocation(loc) {
+        if (!you.layer) return;
+        you.loc = loc;
+        you.pass = null;
+        you.layer.clearLayers();
+        // Listed in the layers menu only when there's something to show.
+        layersControl.removeLayer(you.layer);
+        if (!loc) return;
+        layersControl.addOverlay(you.layer, 'Your location');
+        var title = /^\d{5}$/.test(loc.label) ? 'Your location (' + loc.label + ')' : 'Your location';
+        you.card.querySelector('strong').textContent = title;
+        you.card.querySelector('.pass').textContent = '';
+        you.marker.options.title = title;
+        you.layer.addLayer(you.passLine).addLayer(you.footprint).addLayer(you.marker);
+        updatePass();
+        updateYou();
+    }
+
+    function updatePass() {
+        if (!you.loc) return;
+        var loc = you.loc;
+        yourSky.nextPass('iss').then(function (pass) {
+            if (you.loc !== loc) return;
+            you.pass = pass;
+            you.card.querySelector('.pass').textContent = pass ? 'Your next ISS pass · ' + pass.when : 'No visible ISS passes in the next few days';
+            drawPass();
+        }).catch(function () {
+            you.card.querySelector('.pass').textContent = 'ISS passes aren’t available right now';
+        });
+    }
+
+    function drawPass() {
+        var pass = you.pass, now = Date.now();
+        var ref = map.getCenter().lng;
+        var pts = pass && sky.hasSat('iss')
+            ? sky.track('iss', (pass.start - now) / 60000, (pass.end - now) / 60000, 10, sky.unwrapNear(you.loc.lon, ref)) : [];
+        you.passLine.setLatLngs(pts.map(function (pt) { return [pt.lat, pt.lon]; }));
+        if (pts.length > 1) {
+            var end = pts[pts.length - 1];
+            you.passLabel.setLatLng([end.lat, end.lon]);
+            var label = you.passLabel.options.icon.options.html;
+            label.textContent = 'Your next ISS pass';
+            var when = document.createElement('span');
+            when.className = 'when';
+            when.textContent = pass.when;
+            label.appendChild(when);
+            you.layer.addLayer(you.passLabel);
+        } else {
+            you.layer.removeLayer(you.passLabel);
+        }
+    }
+
+    // Keeps the pin and ring on the world copy nearest the view, and the ring on the selected satellite.
+    function updateYou() {
+        if (!you.loc) return;
+        var center = map.getCenter().lng;
+        you.marker.setLatLng([you.loc.lat, sky.unwrapNear(you.loc.lon, center)]);
+        var p = sky.position(sky.state.selected, new Date());
+        var sat = sky.SATS.filter(function (s) { return s.id === sky.state.selected; })[0];
+        var inside = false;
+        if (p) {
+            var radius = sky.footprintRadius(p.alt, MIN_ELEVATION);
+            you.footprint.setLatLng([p.lat, sky.unwrapNear(p.lon, center)]).setRadius(radius * METERS_PER_DEGREE);
+            you.footprint.setStyle({ color: sat.color });
+            inside = sky.angleBetween(p.lat, p.lon, you.loc.lat, you.loc.lon) <= radius;
+        }
+        var node = you.marker.getElement();
+        if (node) node.classList.toggle('is-inside', inside);
+        var now = you.card.querySelector('.now');
+        now.hidden = !inside;
+        if (inside) now.textContent = (sat.id === 'iss' ? 'The ISS' : sat.name) + ' is above your horizon now';
     }
 
     // Leaflet lines have a single opacity, so a fading track is drawn as bands whose opacity steps
@@ -181,15 +292,18 @@
             updateMarkers();
         }
         if (!map || sky.state.view !== 'map') return;
-        if (type === 'tick') updateMarkers();
-        else if (type === 'minute') { updateTracks(); updateNight(); }
+        if (type === 'tick') { updateMarkers(); updateYou(); }
+        else if (type === 'minute') { updateTracks(); updateNight(); updatePass(); }
         else if (type === 'select' || type === 'ready') {
             updateTracks();   // the bold orbit and the past track follow the selection
             updateMarkers();
+            updateYou();
             var p = sky.position(sky.state.selected, new Date());
             if (p && type === 'select') map.panTo([p.lat, sky.unwrapNear(p.lon, map.getCenter().lng)]);
         }
     });
+
+    if (yourSky) yourSky.on(function (loc) { if (map) setLocation(loc); });
 
     // sky-loader.js loads this file after the Map view is already showing, so the 'view'
     // event that would normally create the map has been and gone.

@@ -13,6 +13,48 @@
     var COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
     var $ = function (id) { return document.getElementById(id); };
+
+    // The /api/sky/visible request for the location being shown, so the globe and map can reuse it.
+    var current = null, changeListeners = [];
+
+    // Shared with the globe and map, which draw your location and your next ISS pass from the same
+    // saved location and the same response, without a second copy of the storage format or a second request.
+    window.TISYourSky = {
+        location: remembered,
+        // Called with the new location whenever the visitor picks one.
+        on: function (fn) { changeListeners.push(fn); },
+        // The next visible pass of a satellite that hasn't ended yet: { start, end, when: "Tue 8:42 PM" }, or null.
+        nextPass: function (id) {
+            var loc = remembered();
+            if (!loc) return Promise.resolve(null);
+            var request = current && current.loc.lat === loc.lat && current.loc.lon === loc.lon
+                ? current.request : fetchVisible(loc);
+            return request.then(function (data) { return nextPass(data, id); });
+        }
+    };
+
+    function nextPass(data, id) {
+        var now = Date.now();
+        var p = (data.passes || []).filter(function (p) {
+            return p.satellite === id && Date.parse(p.end.time) > now;
+        })[0];
+        if (!p) return null;
+        // In the place's own time zone, matching the list in "Your sky".
+        var zone = data.place && data.place.timeZone, fmt;
+        var opts = { weekday: 'short', hour: 'numeric', minute: '2-digit' };
+        try { fmt = new Intl.DateTimeFormat(undefined, Object.assign({ timeZone: zone || undefined }, opts)); }
+        catch (e) { fmt = new Intl.DateTimeFormat(undefined, opts); }
+        var start = new Date(p.start.time);
+        return { start: start, end: new Date(p.end.time), when: fmt.format(start) };
+    }
+
+    function fetchVisible(loc) {
+        return fetch('/api/sky/visible?lat=' + loc.lat + '&lon=' + loc.lon).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        });
+    }
+
     var section = $('your-sky');
     if (!section) return;
 
@@ -109,11 +151,9 @@
         tonightBox.hidden = true;
         conditionsBox.hidden = true;
 
-        fetch('/api/sky/visible?lat=' + loc.lat + '&lon=' + loc.lon)
-            .then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
+        current = { loc: loc, request: fetchVisible(loc) };
+        changeListeners.forEach(function (fn) { try { fn(loc); } catch (e) { console.error(e); } });
+        current.request
             .then(function (data) { render(data, loc); })
             .catch(function () {
                 list.textContent = '';
