@@ -30,6 +30,11 @@ builder.Services.AddHttpClient<SkyDataService>(client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TodayInSpace/1.0 (+https://github.com/Jffrsntaylor/TodayInSpace)");
 });
 
+// "Your sky this week": zip code locations (loaded once) and visible passes, cached per rounded location.
+builder.Services.AddSingleton<ZipLookup>();
+builder.Services.AddSingleton<VisibleSkyCache>();
+builder.Services.AddScoped<VisibleSkyService>();
+
 // /healthz: can we read storage, and did the daily function publish recently?
 builder.Services.AddHealthChecks()
     .AddCheck<StorageHealthCheck>("storage")

@@ -32,8 +32,8 @@ namespace TodayInSpace.Web.Security
             // Modern replacement for X-Frame-Options: nobody may frame this site.
             "frame-ancestors 'none'");
 
-        // The zip code feature may need geolocation=(self) here later.
-        public const string PermissionsPolicy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+        // geolocation=(self) lets "Use my location" in Your sky this week ask the visitor; the browser still prompts first.
+        public const string PermissionsPolicy = "camera=(), microphone=(), geolocation=(self), payment=(), usb=()";
 
         private readonly RequestDelegate _next;
 

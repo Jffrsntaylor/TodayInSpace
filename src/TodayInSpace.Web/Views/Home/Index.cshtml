@@ -155,6 +155,31 @@
             }
         }
 
+        @* "Your sky this week": visible-passes.js asks for a zip or the browser's location, then fills in
+           visible satellite passes from /api/sky/visible. Without a location it shows only the form. *@
+        <section id="your-sky" class="your-sky">
+            <div class="section-label">Your sky this week</div>
+            <div class="card sky-card">
+                <form class="sky-where" id="sky-where" novalidate>
+                    <label for="sky-zip">US zip code</label>
+                    <div class="sky-zip-row">
+                        <input id="sky-zip" name="zip" type="text" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="98501">
+                        <button type="submit" class="chip">Go</button>
+                    </div>
+                    @* Shown by visible-passes.js only if the browser supports geolocation. *@
+                    <button type="button" class="chip" id="sky-geo" hidden>Use my location</button>
+                </form>
+                <div class="sky-showing" id="sky-showing" hidden>
+                    Showing <strong id="sky-place"></strong> &middot; <button type="button" class="sky-change" id="sky-change">Change</button>
+                </div>
+                <p class="sky-error" id="sky-error" role="alert" hidden></p>
+                <p class="sky-intro" id="sky-intro">Enter a zip code or use your location to see when the ISS, Tiangong and Hubble will be visible from where you are over the next 7 days.</p>
+                <div class="sky-passes" id="sky-passes" aria-live="polite"></div>
+                <p class="sky-help" id="sky-help" hidden>Times in your time zone. Predictions can shift by a minute or two as orbits change.</p>
+                <div class="source">Orbits: CelesTrak &middot; Zip locations: U.S. Census Bureau</div>
+            </div>
+        </section>
+
         @* Filled in by sky-core.js from /api/sky/people. Stays hidden if the feed is unavailable. *@
         <section id="people" class="people" hidden>
             <div class="section-label">People in Space</div>
@@ -275,6 +300,7 @@
     <script src="~/lib/satellite.js/satellite.min.js"></script>
     <script src="~/js/sky-core.js" asp-append-version="true"></script>
     <script src="~/js/sky-loader.js" asp-append-version="true"></script>
+    <script src="~/js/visible-passes.js" asp-append-version="true"></script>
     <script src="~/js/starfield.js" asp-append-version="true"></script>
 </body>
 </html>
