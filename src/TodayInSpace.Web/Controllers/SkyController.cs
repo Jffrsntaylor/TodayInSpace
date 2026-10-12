@@ -67,5 +67,18 @@ namespace TodayInSpace.Web.Controllers
             Response.Headers.CacheControl = "public, max-age=600";
             return Ok(launches);
         }
+
+        // GET /api/sky/satellites
+        [HttpGet("satellites")]
+        public async Task<IActionResult> GetSatellites()
+        {
+            var satellites = await _sky.GetSatellitesAsync();
+            if (satellites == null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            // An hour is fine: the catalogue changes a few times a day at most.
+            Response.Headers.CacheControl = "public, max-age=3600";
+            return Ok(satellites);
+        }
     }
 }

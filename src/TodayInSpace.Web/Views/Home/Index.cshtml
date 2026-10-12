@@ -201,6 +201,23 @@
             </div>
         </section>
 
+        @* Filled in by sky-core.js from /api/sky/satellites. Stays hidden if the feed is unavailable. *@
+        <section id="satellites" class="satellites" hidden>
+            <div class="section-label">Satellites</div>
+            <div class="card info satellites-card">
+                <div class="sat-total">
+                    <div class="value" id="sat-active">&mdash;</div>
+                    <div class="sub" title="Satellites CelesTrak lists as operational, partly operational, backup, spare or on an extended mission. Debris and rocket bodies aren't counted.">active satellites orbiting Earth</div>
+                    <div class="sat-starlink" id="sat-starlink" hidden></div>
+                </div>
+                @* Uses the Launches card's bar rows, so both cards look the same. *@
+                <ul class="launch-providers sat-owners" id="sat-owners" hidden></ul>
+                <div class="sat-inventory" id="sat-inventory" hidden></div>
+                @* sky-core.js adds the catalogue date and "checked N hours ago" from the API. *@
+                <div class="source" id="satellites-source">Source: CelesTrak SATCAT</div>
+            </div>
+        </section>
+
         @* sky-loader.js reads these to load the globe and map libraries only when they're needed. *@
         <section class="sky"
                  data-globe-lib="@Url.Content("~/lib/globe.gl/globe.gl.min.js")"

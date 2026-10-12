@@ -21,7 +21,7 @@ namespace TodayInSpace.Web.Tests
             Updated,
             Launches.Source));
 
-        private class FakeStore : ILaunchStore, IPeopleStore
+        private class FakeStore : ILaunchStore, IPeopleStore, ISatelliteStore
         {
             public string? Json { get; init; }
             public int Reads { get; private set; }
@@ -46,7 +46,7 @@ namespace TodayInSpace.Web.Tests
         }
 
         private static SkyDataService Service(FakeStore launches, DateTimeOffset? now = null) =>
-            new(new HttpClient(new NoNetwork()), new FakeStore(), launches, new MemoryCache(new MemoryCacheOptions()),
+            new(new HttpClient(new NoNetwork()), new FakeStore(), launches, new FakeStore(), new MemoryCache(new MemoryCacheOptions()),
                 NullLogger<SkyDataService>.Instance, new FixedClock(now ?? Now));
 
         private static SkyController Controller(SkyDataService service) => new(service)

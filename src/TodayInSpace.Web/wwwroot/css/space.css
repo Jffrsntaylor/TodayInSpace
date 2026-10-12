@@ -296,11 +296,34 @@ a { color: var(--accent); }
     background: linear-gradient(90deg, var(--accent), var(--c));
 }
 .launch-provider-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch-provider-name .flag { display: inline-block; vertical-align: -2px; margin-right: 6px; border-radius: 2px; }
 .launch-provider-count { font-weight: 700; font-variant-numeric: tabular-nums; }
 .launch-provider.others { color: var(--ink-soft); }
 .launch-latest { margin-top: 12px; font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
 @media (max-width: 640px) {
     .launches .card { grid-template-columns: 1fr; padding: 20px 14px; }
+}
+
+/* ---- Satellites ---- */
+/* The total on the left, owners on the right; stacked on phones. Bar rows come from the Launches card. */
+.satellites .card {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 16px 40px;
+    align-items: center;
+    text-align: left;
+    animation: rise .6s ease .3s both;
+}
+.satellites .card:hover { transform: none; }
+.sat-total { min-width: 0; }
+.sat-total .sub { cursor: help; }
+.sat-starlink { margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
+.sat-owners { margin-top: 0; min-width: 0; }
+.sat-inventory, .satellites .source { grid-column: 1 / -1; }
+.sat-inventory { font-size: 13px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.satellites .source { margin-top: 0; }
+@media (max-width: 640px) {
+    .satellites .card { grid-template-columns: 1fr; padding: 20px 14px; }
 }
 
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }

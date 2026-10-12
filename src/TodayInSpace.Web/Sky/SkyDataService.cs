@@ -27,6 +27,7 @@ namespace TodayInSpace.Web.Sky
         private static readonly TimeSpan AuroraTtl = TimeSpan.FromMinutes(10);  // OVATION updates roughly every 5-10 minutes
         private static readonly TimeSpan PeopleTtl = TimeSpan.FromMinutes(10);  // saves a blob read per visitor; the function refreshes every 3 hours
         private static readonly TimeSpan LaunchesTtl = TimeSpan.FromMinutes(10); // the next launch is refreshed hourly, so don't sit on it
+        private static readonly TimeSpan SatellitesTtl = TimeSpan.FromMinutes(30); // the function checks every 6 hours
         private static readonly TimeSpan StaleTtl = TimeSpan.FromDays(3);
 
         // One refresh at a time per process so a burst of visitors triggers a single upstream call.
@@ -35,15 +36,17 @@ namespace TodayInSpace.Web.Sky
         private readonly HttpClient _http;
         private readonly IPeopleStore _people;
         private readonly ILaunchStore _launches;
+        private readonly ISatelliteStore _satellites;
         private readonly IMemoryCache _cache;
         private readonly ILogger<SkyDataService> _logger;
         private readonly TimeProvider _clock;
 
-        public SkyDataService(HttpClient http, IPeopleStore people, ILaunchStore launches, IMemoryCache cache, ILogger<SkyDataService> logger, TimeProvider clock)
+        public SkyDataService(HttpClient http, IPeopleStore people, ILaunchStore launches, ISatelliteStore satellites, IMemoryCache cache, ILogger<SkyDataService> logger, TimeProvider clock)
         {
             _http = http;
             _people = people;
             _launches = launches;
+            _satellites = satellites;
             _cache = cache;
             _logger = logger;
             _clock = clock;
@@ -95,6 +98,22 @@ namespace TodayInSpace.Web.Sky
                 return null;
             }
             return launches;
+        }
+
+        // Same again: the RefreshSatellites function downloads CelesTrak's catalogue; this only reads its counts.
+        // Null until the function has written it once, and null again if it stops checking for a week.
+        public async Task<SatellitesSnapshot?> GetSatellitesAsync()
+        {
+            var satellites = await GetCachedAsync("sky:satellites", SatellitesTtl,
+                async () => Satcat.Parse(await _satellites.ReadAsync()));
+
+            // Checked after the cache so the stale fallback copy ages out too.
+            if (satellites != null && Satcat.IsTooOld(satellites, _clock.GetUtcNow()))
+            {
+                _logger.LogWarning("satellites.json is too old to show (checked {Checked}).", satellites.Checked);
+                return null;
+            }
+            return satellites;
         }
 
         private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch) where T : class
