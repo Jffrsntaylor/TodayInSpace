@@ -26,6 +26,7 @@ namespace TodayInSpace.Web.Sky
         private static readonly TimeSpan TleTtl = TimeSpan.FromHours(6);        // CelesTrak asks clients not to poll more often than every couple of hours
         private static readonly TimeSpan AuroraTtl = TimeSpan.FromMinutes(10);  // OVATION updates roughly every 5-10 minutes
         private static readonly TimeSpan PeopleTtl = TimeSpan.FromMinutes(10);  // saves a blob read per visitor; the function refreshes every 3 hours
+        private static readonly TimeSpan LaunchesTtl = TimeSpan.FromMinutes(10); // the next launch is refreshed hourly, so don't sit on it
         private static readonly TimeSpan StaleTtl = TimeSpan.FromDays(3);
 
         // One refresh at a time per process so a burst of visitors triggers a single upstream call.
@@ -33,14 +34,16 @@ namespace TodayInSpace.Web.Sky
 
         private readonly HttpClient _http;
         private readonly IPeopleStore _people;
+        private readonly ILaunchStore _launches;
         private readonly IMemoryCache _cache;
         private readonly ILogger<SkyDataService> _logger;
         private readonly TimeProvider _clock;
 
-        public SkyDataService(HttpClient http, IPeopleStore people, IMemoryCache cache, ILogger<SkyDataService> logger, TimeProvider clock)
+        public SkyDataService(HttpClient http, IPeopleStore people, ILaunchStore launches, IMemoryCache cache, ILogger<SkyDataService> logger, TimeProvider clock)
         {
             _http = http;
             _people = people;
+            _launches = launches;
             _cache = cache;
             _logger = logger;
             _clock = clock;
@@ -76,6 +79,22 @@ namespace TodayInSpace.Web.Sky
                 return null;
             }
             return people;
+        }
+
+        // Same as people: the RefreshLaunches function fetches LL2 and stores the result; this only reads it.
+        // Null until the function has written it once, and null again if it stops refreshing for a week.
+        public async Task<LaunchesSnapshot?> GetLaunchesAsync()
+        {
+            var launches = await GetCachedAsync("sky:launches", LaunchesTtl,
+                async () => Launches.Parse(await _launches.ReadAsync()));
+
+            // Checked after the cache so the stale fallback copy ages out too.
+            if (launches != null && Launches.IsTooOld(launches, _clock.GetUtcNow()))
+            {
+                _logger.LogWarning("launches.json is too old to show (updated {Updated}).", launches.Updated);
+                return null;
+            }
+            return launches;
         }
 
         private async Task<T?> GetCachedAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> fetch) where T : class

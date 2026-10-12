@@ -27,6 +27,11 @@ namespace TodayInSpace.Web.Tests
             }
         }
 
+        private class NoLaunches : ILaunchStore
+        {
+            public Task<string?> ReadAsync() => Task.FromResult<string?>(null);
+        }
+
         // Fails the test if anything tries to go upstream: the web app must not call LL2.
         private class NoNetwork : HttpMessageHandler
         {
@@ -44,7 +49,7 @@ namespace TodayInSpace.Web.Tests
         private static readonly DateTimeOffset Now = new(2026, 10, 7, 13, 15, 0, TimeSpan.Zero);
 
         private static SkyDataService Service(FakeStore store, DateTimeOffset? now = null) =>
-            new(new HttpClient(new NoNetwork()), store, new MemoryCache(new MemoryCacheOptions()),
+            new(new HttpClient(new NoNetwork()), store, new NoLaunches(), new MemoryCache(new MemoryCacheOptions()),
                 NullLogger<SkyDataService>.Instance, new FixedClock(now ?? Now));
 
         [Fact]

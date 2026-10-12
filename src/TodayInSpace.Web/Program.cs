@@ -18,6 +18,8 @@ builder.Services.AddScoped<DigestService>();
 builder.Services.AddMemoryCache();
 // People in space comes from storage; the function app fetches it from LL2 on a timer.
 builder.Services.AddSingleton<IPeopleStore, BlobPeopleStore>();
+// So do the launches (next launch + this year's count).
+builder.Services.AddSingleton<ILaunchStore, BlobLaunchStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<FlagIcons>();
 builder.Services.AddHttpClient<SkyDataService>(client =>

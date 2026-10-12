@@ -234,6 +234,75 @@ a { color: var(--accent); }
 @media (max-width: 640px) {
     .people.has-list .card { grid-template-columns: 1fr; padding: 20px 14px; }
 }
+
+/* ---- Launches ---- */
+/* Next launch on the left, the year's count on the right; stacked on phones. */
+.launches .card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 40px;
+    text-align: left;
+    animation: rise .6s ease .25s both;
+}
+.launches .card:hover { transform: none; }
+.launches .source { grid-column: 1 / -1; }
+.launch-next, .launch-year { min-width: 0; }
+.launch-heading {
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+}
+.launch-next-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.launch-countdown {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.launch-name { color: var(--ink); font-size: 16px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.launch-where { color: var(--ink-soft); font-size: 13px; margin-top: 4px; }
+.launch-when {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--ink);
+}
+.launch-status { color: var(--c); font-weight: 600; }
+.launch-year .value { margin-top: 2px; }
+.launch-year .sub { cursor: help; }
+.launch-outcomes { margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+.launch-providers { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+/* Bar, then the name (truncated if long), then the count, which always stays visible. */
+.launch-provider {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink);
+}
+.launch-bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.launch-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--c));
+}
+.launch-provider-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch-provider-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.launch-provider.others { color: var(--ink-soft); }
+.launch-latest { margin-top: 12px; font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+    .launches .card { grid-template-columns: 1fr; padding: 20px 14px; }
+}
+
 .card .source { margin-top: 12px; font-size: 11px; color: var(--ink-faint); }
 .card .source .stale { color: var(--watch); }
 
