@@ -170,6 +170,37 @@
             </div>
         </section>
 
+        @* Filled in by sky-core.js from /api/sky/launches. Each half hides on its own if its data is missing,
+           and the whole section stays hidden if both are. *@
+        <section id="launches" class="launches" hidden>
+            <div class="section-label">Launches</div>
+            <div class="card info launches-card">
+                <div class="launch-next" id="launch-next" hidden>
+                    <div class="launch-next-head">
+                        <h3 class="launch-heading">Next launch</h3>
+                        @* Ticks every 30 seconds, so screen readers aren't told about each change. *@
+                        <div class="launch-countdown" id="launch-countdown" aria-live="off" hidden></div>
+                    </div>
+                    <div class="launch-name" id="launch-name"></div>
+                    <div class="launch-where" id="launch-where"></div>
+                    <div class="launch-when">
+                        <time id="launch-time"></time>
+                        <span class="launch-status" id="launch-status"></span>
+                    </div>
+                </div>
+                <div class="launch-year" id="launch-year" hidden>
+                    <h3 class="launch-heading" id="launch-year-heading">Launches this year</h3>
+                    <div class="value" id="launch-total">&mdash;</div>
+                    <div class="sub" title="Every launch that tried to reach orbit, including failures. Suborbital flights aren't counted.">orbital launch attempts so far this year</div>
+                    <div class="launch-outcomes" id="launch-outcomes"></div>
+                    <ul class="launch-providers" id="launch-providers" hidden></ul>
+                    <div class="launch-latest" id="launch-latest" hidden></div>
+                </div>
+                @* sky-core.js adds "updated N hours ago" from the API's timestamp. *@
+                <div class="source" id="launches-source">Source: The Space Devs</div>
+            </div>
+        </section>
+
         @* sky-loader.js reads these to load the globe and map libraries only when they're needed. *@
         <section class="sky"
                  data-globe-lib="@Url.Content("~/lib/globe.gl/globe.gl.min.js")"

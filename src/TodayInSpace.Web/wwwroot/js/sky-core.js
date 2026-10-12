@@ -131,7 +131,7 @@ window.TISSky = (function () {
         if (!section || !data || typeof data.count !== 'number') return;
         $('people-count').textContent = fmt.format(data.count);
         section.hidden = false;
-        showUpdated(data.updated);
+        showUpdated('people-source', data.updated, PEOPLE_STALE_HOURS);
         try {
             if (Array.isArray(data.people) && data.people.length) showPeople(data.people);
         } catch (e) {
@@ -150,17 +150,181 @@ window.TISSky = (function () {
         return days + (days === 1 ? ' day ago' : ' days ago');
     }
 
-    // Adds when the list was fetched to the card's source line, and says so if it's getting old.
+    // Adds when the data was fetched to a card's source line, and says so if it's getting old.
     // Old data is still shown: being honest about its age beats hiding it.
-    function showUpdated(updated) {
-        var source = $('people-source');
+    function showUpdated(id, updated, staleHours) {
+        var source = $(id);
         var t = new Date(updated);
         if (!source || !updated || isNaN(t)) return;
         var age = Math.max(0, Date.now() - t);
         source.title = 'Updated ' + t.toLocaleString();
         source.appendChild(document.createTextNode(' · updated ' + timeAgo(age)));
-        if (age > PEOPLE_STALE_HOURS * 3600000)
+        if (age > staleHours * 3600000)
             source.appendChild(el('span', 'stale', ' · may be out of date'));
+    }
+
+    // ---- Launches ----
+
+    // The function refreshes hourly, so 6 hours means six runs in a row were missed.
+    var LAUNCHES_STALE_HOURS = 6;
+    var HOUR = 3600000;
+    var PROVIDERS_SHOWN = 5;
+    // Only these precisions carry a real time. Coarser ones (DAY, M, Q...) use placeholders like 00:00Z.
+    var TIMED = { SEC: true, MIN: true, HR: true };
+    var STATUS_TEXT = { 1: 'Go for launch', 2: 'Date not final', 5: 'On hold', 8: 'To be confirmed' };
+    var STATUS_GO = 1;
+
+    // The card shows whatever half has data: the next launch, the year's count, or both.
+    getJson('/api/sky/launches').then(function (data) {
+        var section = $('launches');
+        if (!section || !data) return;
+        var upcoming = Array.isArray(data.upcoming) ? data.upcoming : [];
+        var hasStats = !!data.stats && typeof data.stats.total === 'number';
+        if (hasStats) showYear(data.stats);
+        if (upcoming.length) startNextLaunch(upcoming);
+        if (!hasStats && $('launch-next').hidden) return;
+        section.hidden = false;
+        showUpdated('launches-source', data.updated, LAUNCHES_STALE_HOURS);
+    }).catch(function () { /* no data and no cached copy: keep the card hidden */ });
+
+    // The number first, then the breakdown in a try/catch, so a problem with the breakdown can't hide it.
+    function showYear(stats) {
+        var year = typeof stats.year === 'number' ? stats.year : '';
+        $('launch-year-heading').textContent = 'Launches in ' + year;
+        $('launch-total').textContent = fmt.format(stats.total);
+        $('launch-year').hidden = false;
+        try {
+            if (stats.total === 0) {
+                $('launch-outcomes').textContent = 'No orbital launches yet in ' + year;
+                return;
+            }
+            var parts = [fmt.format(stats.successes) + ' successful', fmt.format(stats.failures) + ' failed'];
+            if (stats.partialFailures > 0) parts.push(fmt.format(stats.partialFailures) + ' partial');
+            if (stats.inFlight > 0) parts.push(fmt.format(stats.inFlight) + ' in flight');
+            $('launch-outcomes').textContent = parts.join(' · ');
+            if (Array.isArray(stats.providers) && stats.providers.length) showProviders(stats.providers);
+            if (stats.latest) showLatest(stats.latest);
+        } catch (e) {
+            console.error('Couldn’t show the launch breakdown', e);
+        }
+    }
+
+    // The server sorts providers by count, then name. The top few get a bar; the rest are summed.
+    function showProviders(providers) {
+        var list = $('launch-providers');
+        var top = providers.slice(0, PROVIDERS_SHOWN);
+        var max = top[0].count || 1;
+        top.forEach(function (p) {
+            var row = providerRow(p.name, p.count);
+            var fill = el('span', 'launch-bar-fill');
+            // Set from script, not a style="" attribute, so it still works once the CSP is enforced.
+            fill.style.width = Math.max(2, Math.round(p.count / max * 100)) + '%';
+            row.querySelector('.launch-bar').appendChild(fill);
+            list.appendChild(row);
+        });
+        var others = providers.slice(PROVIDERS_SHOWN).reduce(function (sum, p) { return sum + p.count; }, 0);
+        if (others > 0) list.appendChild(providerRow('Others', others, 'others'));
+        list.hidden = false;
+    }
+
+    function providerRow(name, count, extra) {
+        var row = el('li', 'launch-provider' + (extra ? ' ' + extra : ''));
+        row.appendChild(el('span', 'launch-bar'));
+        var label = el('span', 'launch-provider-name', name);
+        label.title = name;
+        row.appendChild(label);
+        row.appendChild(el('span', 'launch-provider-count', fmt.format(count)));
+        return row;
+    }
+
+    function showLatest(latest) {
+        var t = new Date(latest.net);
+        var box = $('launch-latest');
+        box.textContent = 'Latest: ' + latest.name +
+            (isNaN(t) ? '' : ' · ' + t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+        box.hidden = false;
+    }
+
+    // The data can be up to an hour old, so a launch is kept for an hour after its time ("Launch window
+    // open") and then skipped. The pick is redone on every tick, so the card moves on by itself.
+    function pickNextLaunch(upcoming, now) {
+        for (var i = 0; i < upcoming.length; i++) {
+            var t = Date.parse(upcoming[i].net);
+            if (!isNaN(t) && t > now - HOUR) return upcoming[i];
+        }
+        return null;
+    }
+
+    function startNextLaunch(upcoming) {
+        var shown = null;
+        function update() {
+            var launch = pickNextLaunch(upcoming, Date.now());
+            var box = $('launch-next');
+            if (!launch) {
+                box.hidden = true;
+                return false;
+            }
+            if (launch !== shown) {
+                showNextLaunch(launch);
+                shown = launch;
+            }
+            updateCountdown(launch);
+            box.hidden = false;
+            return true;
+        }
+        try {
+            if (update()) {
+                setInterval(function () { if (!document.hidden) update(); }, 30000);
+                // Ticks pause in a background tab, so catch up as soon as it's visible again.
+                document.addEventListener('visibilitychange', function () { if (!document.hidden) update(); });
+            }
+        } catch (e) {
+            console.error('Couldn’t show the next launch', e);
+        }
+    }
+
+    function showNextLaunch(launch) {
+        var t = new Date(launch.net);
+        var precision = launch.precision || '';
+        $('launch-name').textContent = launch.name;
+        $('launch-where').textContent = [launch.provider, launch.location].filter(Boolean).join(' · ');
+
+        var time = $('launch-time');
+        time.setAttribute('datetime', launch.net);
+        if (TIMED[precision]) {
+            time.textContent = t.toLocaleString(undefined,
+                { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        } else if (precision === 'DAY') {
+            // Shown in UTC: the placeholder time is midnight UTC, which is the day before in the Americas.
+            time.textContent = t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+        } else {
+            time.textContent = 'NET ' + t.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        }
+
+        var status = STATUS_TEXT[launch.statusId] || launch.statusAbbrev || '';
+        if (launch.probability != null) status += (status ? ' · ' : '') + launch.probability + '% weather go';
+        $('launch-status').textContent = status;
+    }
+
+    // "T−2d 4h", "T−3h 12m", "T−8m"; "Launch window open" for an hour after T-0. Only for a launch that's
+    // Go with a real time: anything else could count down to a placeholder.
+    function updateCountdown(launch) {
+        var box = $('launch-countdown');
+        if (launch.statusId !== STATUS_GO || !TIMED[launch.precision]) {
+            box.hidden = true;
+            return;
+        }
+        var ms = Date.parse(launch.net) - Date.now();
+        box.textContent = ms <= 0 ? 'Launch window open' : countdown(ms);
+        box.hidden = false;
+    }
+
+    function countdown(ms) {
+        var minutes = Math.ceil(ms / 60000);
+        var d = Math.floor(minutes / 1440), h = Math.floor(minutes % 1440 / 60), m = minutes % 60;
+        if (d > 0) return 'T−' + d + 'd ' + h + 'h';
+        if (h > 0) return 'T−' + h + 'h ' + m + 'm';
+        return 'T−' + m + 'm';
     }
 
     function el(tag, className, text) {

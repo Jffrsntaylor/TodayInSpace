@@ -54,5 +54,18 @@ namespace TodayInSpace.Web.Controllers
             Response.Headers.CacheControl = "public, max-age=600";
             return Ok(people);
         }
+
+        // GET /api/sky/launches
+        [HttpGet("launches")]
+        public async Task<IActionResult> GetLaunches()
+        {
+            var launches = await _sky.GetLaunchesAsync();
+            if (launches == null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            // Short, because the next launch is refreshed hourly and its time can slip.
+            Response.Headers.CacheControl = "public, max-age=600";
+            return Ok(launches);
+        }
     }
 }
