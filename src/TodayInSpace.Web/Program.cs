@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TodayInSpace.Web.Health;
 using TodayInSpace.Web.Helpers;
@@ -22,8 +24,17 @@ builder.Services.AddSingleton<IPeopleStore, BlobPeopleStore>();
 builder.Services.AddSingleton<ILaunchStore, BlobLaunchStore>();
 // And the satellite counts, so the web app never downloads CelesTrak's 7 MB catalogue itself.
 builder.Services.AddSingleton<ISatelliteStore, BlobSatelliteStore>();
+// Every active satellite's orbit for the globe's point cloud, ~2.7 MB, also written by the function app.
+builder.Services.AddSingleton<IActiveSatelliteStore, BlobActiveSatelliteStore>();
+builder.Services.AddSingleton<ActiveSatellitesService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<FlagIcons>();
+
+// Compression for the active satellites file only (2.7 MB of JSON -> ~0.9 MB). Fastest, because it's
+// compressed per request, and the result is public data, so compressing over HTTPS leaks nothing.
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 builder.Services.AddHttpClient<SkyDataService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
@@ -71,6 +82,7 @@ if (!app.Environment.IsDevelopment())
 app.UseSecurityHeaders();
 
 app.UseHttpsRedirection();
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/sky/active-satellites"), branch => branch.UseResponseCompression());
 app.UseRouting();
 
 app.MapStaticAssets();

@@ -117,5 +117,20 @@ namespace TodayInSpace.Web.Controllers
             Response.Headers.CacheControl = "public, max-age=3600";
             return Ok(satellites);
         }
+
+        // GET /api/sky/active-satellites
+        // Every active satellite's TLE for the globe's point cloud. Only fetched when a visitor turns on a group,
+        // and served exactly as the function stored it (compressed on the way out, see Program.cs).
+        [HttpGet("active-satellites")]
+        public async Task<IActionResult> GetActiveSatellites([FromServices] ActiveSatellitesService active)
+        {
+            var json = await active.GetJsonAsync();
+            if (json == null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            // The function refreshes every 6 hours, and a few hours' old TLEs are still accurate to a few km.
+            Response.Headers.CacheControl = "public, max-age=3600";
+            return Content(json, "application/json");
+        }
     }
 }
