@@ -44,6 +44,7 @@ Run these yourself from the repo root, signed in with `az login`. Values come fr
 
 ```powershell
 $env:NASA_API_KEY = "<NASA API key>"
+$env:CARTO_KEY = "<CARTO basemap key>"
 $env:TIS_FUNCTION_CONTENT_SHARE = "<live WEBSITE_CONTENTSHARE value>"
 # Only if the apps already have App Insights connected (copy from each app's settings):
 $env:TIS_WEB_APPINSIGHTS_CONNECTION_STRING = "<web app's value>"
@@ -112,6 +113,11 @@ there first, and use `export NAME=value` instead of `$env:NAME = "value"`.
    you can't accidentally deploy a function app without the key.
    ```powershell
    $env:NASA_API_KEY = "<NASA API key>"
+   ```
+   Set the CARTO key for the flat map too. It's optional to the template, but since app settings are
+   all-or-nothing, deploying without it blanks `Map__CartoKey` on the web app and the map loses its basemap.
+   ```powershell
+   $env:CARTO_KEY = "<CARTO basemap key>"
    ```
 4. **Preview.** This makes no changes. Everything should show as `Create`. If a name is already taken somewhere
    in Azure, this is where you'll find out.

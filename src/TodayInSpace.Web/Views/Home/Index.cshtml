@@ -1,5 +1,6 @@
 @model TodayInSpace.Web.Models.DigestModel
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersion
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
 @{
     ViewData["Title"] = "Today in Space";
     Layout = null;
@@ -285,7 +286,7 @@
             </div>
             <div class="sky-panel">
                 <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" data-night-texture="/img/earth-night-lights.jpg" aria-label="3D globe showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
-                <div id="sky-map" class="sky-map" hidden aria-label="World map showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
+                <div id="sky-map" class="sky-map" hidden data-carto-key="@TodayInSpace.Web.Helpers.MapSettings.CartoKey(Config)" aria-label="World map showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
                 <div class="sky-readout">
                     <div class="sat-title">
                         <strong id="sat-name">International Space Station</strong>

@@ -51,6 +51,10 @@ param functionContentShare string
 @description('NASA API key for the daily fetch.')
 param nasaApiKey string
 
+@secure()
+@description('CARTO basemap key for the flat map. Shown to browsers by design (restrict it by domain in CARTO). Empty means the map runs without a basemap.')
+param cartoKey string = ''
+
 // ---------- Application Insights ----------
 
 @description('Create a new Log Analytics workspace and Application Insights and connect both apps to it.')
@@ -205,6 +209,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'Storage__ConnectionString', value: storageConnectionString }
         { name: 'Storage__ContainerName', value: digestsContainerName }
         { name: 'Storage__ImagesContainerName', value: imagesContainerName }
+        { name: 'Map__CartoKey', value: cartoKey }
       ], webLinuxDeploySettings, webAppInsightsSettings)
     })
   }

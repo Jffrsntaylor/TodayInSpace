@@ -1,5 +1,5 @@
 // The company subscription: resource group rg-todayinspace in West US 2, built fresh from main.bicep.
-// No secrets here: the NASA key is read from an environment variable at deploy time.
+// No secrets here: the NASA and CARTO keys are read from environment variables at deploy time.
 using 'main.bicep'
 
 param location = 'westus2'
@@ -25,6 +25,9 @@ param functionStorageAccountName = 'tisdatagdv7m'
 param functionContentShare = 'tis-func-content'
 
 param nasaApiKey = readEnvironmentVariable('NASA_API_KEY')
+
+// Optional, but without it a deploy blanks the live Map__CartoKey setting and the map loses its basemap.
+param cartoKey = readEnvironmentVariable('CARTO_KEY', '')
 
 // Application Insights is its own later step.
 param appInsights = false

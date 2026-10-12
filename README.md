@@ -37,8 +37,11 @@ You'll need the .NET 10 SDK (and Azure Functions Core Tools to run the function 
 ```bash
 cd src/TodayInSpace.Web
 dotnet user-secrets set "Storage:ConnectionString" "<your Azure Storage connection string>"
+dotnet user-secrets set "Map:CartoKey" "<your CARTO basemap key>"
 dotnet run
 ```
+
+The CARTO key is free from [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey). Without it the flat map still works, just without the dark basemap underneath.
 
 Run the tests with `dotnet test TodayInSpace.slnx`.
 

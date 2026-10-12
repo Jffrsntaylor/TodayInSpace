@@ -744,7 +744,9 @@ a { color: var(--accent); }
 .sky-hint { font-size: 12px; color: var(--ink-faint); }
 
 /* Leaflet, dark */
-.leaflet-container { font-family: 'Manrope', system-ui, sans-serif; background: #0a0f1f; }
+/* .sky-map too: leaflet.css loads after this file, so a plain .leaflet-container rule loses to its grey. That
+   grey shows whenever the map has no basemap tiles. */
+.leaflet-container, .sky-map.leaflet-container { font-family: 'Manrope', system-ui, sans-serif; background: #0a0f1f; }
 .leaflet-control-attribution { background: rgba(4, 6, 13, 0.7) !important; color: var(--ink-faint) !important; }
 .leaflet-control-attribution a { color: var(--ink-soft) !important; }
 .leaflet-bar a, .leaflet-control-layers {
