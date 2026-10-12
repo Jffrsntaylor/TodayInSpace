@@ -4,6 +4,8 @@
 // With a location saved in "Your sky", also a pin there, your next visible ISS pass drawn in space, and the
 // selected satellite's footprint: where on Earth it's at least 10° above the horizon right now.
 // The upcoming launches' pads get a small rocket, and the next one a label with its countdown.
+// Chips under the globe add every other active satellite as a cloud of tiny dots (Starlink, navigation,
+// geostationary, everything else); tap a dot for its name.
 (function () {
     'use strict';
 
@@ -241,6 +243,10 @@
         showAurora(lastAurora);
     });
 
+    // The Stations chip and the satellite point cloud (set up further down) both feed updateMarkers.
+    var stationsOn = true, inView = true;
+    var cloud = { worker: null, loaded: false, busy: false, label: null, eased: false };
+
     // ---- Satellites (HTML markers that follow the globe and hide behind it) ----
     var markers = sky.SATS.map(function (s) {
         var node = document.createElement('button');
@@ -265,8 +271,9 @@
         var now = new Date();
         var shown = [];
         markers.forEach(function (m) {
-            var p = sky.position(m.id, now);
-            if (!p) return;
+            var p = stationsOn ? sky.position(m.id, now) : null;
+            // Hidden (or not loaded yet): snap rather than tween when it comes back.
+            if (!p) { m.visible = false; return; }
             // Keep longitude continuous so the 1-second tween never spins the long way around.
             m.lng = m.visible ? sky.unwrapNear(p.lon, m.lng) : p.lon;
             m.lat = p.lat;
@@ -279,7 +286,8 @@
         Array.prototype.push.apply(shown, pads.list);
         // globe.gl sets each element's z-index by distance, so the label could cover the open card,
         // which says the same thing anyway.
-        if (you.passPath && card.hidden) shown.push(you.label);
+        if (stationsOn && you.passPath && card.hidden) shown.push(you.label);
+        if (cloud.label) shown.push(cloud.label);
         globe.htmlElementsData(shown);
     }
 
@@ -353,6 +361,8 @@
 
     // The orbit objects are kept between calls, so the once-a-second footprint update doesn't recompute them.
     function renderPaths() {
+        // The orbits, your ISS pass and the footprint all belong to the stations, so the Stations chip hides them too.
+        if (!stationsOn) { globe.pathsData([]); return; }
         var paths = orbitPaths.slice();
         if (you.passPath) paths.push(you.passPath);
         if (you.footprint) paths.push(you.footprint);
@@ -644,6 +654,268 @@
         }
     }
 
+    // ---- Every active satellite: a calm point cloud with group toggles ----
+    // ~16,000 dots, no labels or orbit lines, one draw call per group (globe.gl's particles layer). The TLEs are
+    // only downloaded when a visitor turns on a group, and sat-worker.js propagates them off the main thread.
+    // Mild transparency so the dense Starlink shell shimmers instead of looking like a solid sheet.
+    var GROUPS = [
+        { id: 'starlink', color: 'rgba(225, 235, 255, 0.7)' },
+        { id: 'navigation', color: 'rgba(255, 190, 90, 0.9)', shellKm: 20200 },
+        { id: 'geo', color: 'rgba(95, 225, 240, 0.9)', shellKm: 35786 },
+        { id: 'other', color: 'rgba(175, 180, 195, 0.55)' }
+    ];
+    var groupChips = document.querySelectorAll('.sat-groups [data-group]');
+    var on = { stations: true };
+
+    // Points are drawn in device pixels, so scale up on high-DPI screens to stay ~1.5 CSS px.
+    var POINT_SIZE = 1.5 * Math.min(window.devicePixelRatio || 1, 2);
+    globe
+        .particlesData(GROUPS)
+        .particlesList(function () { return []; })
+        .particlesSize(function () { return POINT_SIZE; })
+        .particlesSizeAttenuation(false)
+        .particlesColor('color');
+
+    // globe.gl builds one three.js Points object per group; their position buffers are then filled directly
+    // from the worker's Float32Arrays, which skips globe.gl's per-point objects entirely.
+    function pointsOf(g) {
+        if (g.points) return g.points;
+        globe.scene().traverse(function (o) {
+            if (o.__globeObjType === 'particles' && o.__data === g) g.points = o;
+        });
+        return g.points || null;
+    }
+
+    function showGroups() {
+        GROUPS.forEach(function (g) {
+            var pts = pointsOf(g);
+            if (pts) pts.visible = cloud.loaded && !!on[g.id] && !!g.attr;
+        });
+    }
+
+    function enabledGroups() {
+        return GROUPS.filter(function (g) { return on[g.id]; }).map(function (g) { return g.id; });
+    }
+
+    function groupById(id) {
+        return GROUPS.filter(function (g) { return g.id === id; })[0];
+    }
+
+    // Phones and small CPUs tick less often; a dot moves ~15 km per 2 s, under a pixel at most zooms.
+    var TICK_MS = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+        window.matchMedia('(max-width: 640px)').matches ? 5000 : 2000;
+
+    // Skipped while the globe isn't drawing (map view, scrolled away, tab hidden), so it costs nothing then.
+    function cloudTick() {
+        if (!cloud.loaded || cloud.busy || document.hidden || sky.state.view !== 'globe' || !inView) return;
+        var ids = enabledGroups();
+        if (!ids.length) return;
+        cloud.busy = true;
+        cloud.worker.postMessage({ type: 'tick', time: Date.now(), groups: ids });
+    }
+    setInterval(cloudTick, TICK_MS);
+    document.addEventListener('visibilitychange', cloudTick);
+
+    function onPositions(m) {
+        cloud.busy = false;
+        GROUPS.forEach(function (g) {
+            var xyz = m.groups[g.id], pts = pointsOf(g);
+            if (!xyz || !pts) return;
+            if (!g.attr) {
+                // globe.gl doesn't expose three.js, so borrow the attribute class from the empty one it made.
+                var Attr = pts.geometry.getAttribute('position').constructor;
+                g.attr = new Attr(new Float32Array(xyz.length), 3);
+                pts.geometry.setAttribute('position', g.attr);
+                // The cloud surrounds the camera's target, so never cull it as a whole.
+                pts.frustumCulled = false;
+            }
+            g.attr.array.set(xyz);
+            g.attr.needsUpdate = true;
+            pts.geometry.computeBoundingSphere();
+        });
+        showGroups();
+        moveLabel();
+    }
+
+    function setChip(chip, pressed) {
+        chip.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    }
+
+    function chipCount(chip, text) {
+        var n = chip.querySelector('.n');
+        if (n) n.textContent = text;
+    }
+
+    function loadCloud() {
+        if (cloud.worker || !window.Worker) return;
+        var section = document.getElementById('live-sky');
+        groupChips.forEach(function (c) { chipCount(c, ' · loading…'); });
+        try {
+            cloud.worker = new Worker(section.getAttribute('data-sat-worker'));
+        } catch (e) {
+            cloudFailed();
+            return;
+        }
+        cloud.worker.onmessage = function (e) {
+            var m = e.data;
+            if (m.type === 'loaded') {
+                cloud.loaded = true;
+                GROUPS.forEach(function (g) { g.names = m.groups[g.id] || []; });
+                groupChips.forEach(function (c) {
+                    var g = groupById(c.dataset.group);
+                    if (g) chipCount(c, ' ' + g.names.length.toLocaleString());
+                });
+                cloudTick();
+            } else if (m.type === 'positions') {
+                onPositions(m);
+            } else if (m.type === 'error') {
+                cloudFailed();
+            }
+        };
+        cloud.worker.onerror = cloudFailed;
+        cloud.worker.postMessage({
+            type: 'init',
+            url: new URL('/api/sky/active-satellites', location.href).href,
+            lib: new URL(section.getAttribute('data-satellite-lib'), location.href).href,
+            globeRadius: globe.getGlobeRadius()
+        });
+    }
+
+    // No data (not written yet, or offline): say so on the chips. A later toggle tries again.
+    function cloudFailed() {
+        if (cloud.worker) cloud.worker.terminate();
+        cloud.worker = null;
+        cloud.loaded = false;
+        cloud.busy = false;
+        groupChips.forEach(function (c) {
+            if (!groupById(c.dataset.group)) return;
+            on[c.dataset.group] = false;
+            setChip(c, false);
+            chipCount(c, ' · unavailable');
+        });
+        showGroups();
+    }
+
+    // How far out the camera must be to see a whole shell (~4.2 Earth radii for navigation, ~6.6 for the ring).
+    // Also lets the visitor zoom out that far, and keeps it inside the camera's far plane.
+    function altitudeToSee(g) {
+        var camera = globe.camera(), R = globe.getGlobeRadius();
+        var shell = 1 + g.shellKm / EARTH_RADIUS_KM;
+        var halfV = camera.fov * Math.PI / 360, halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+        var distance = shell * 1.15 / Math.tan(Math.min(halfV, halfH)) * R;
+        controls.maxDistance = Math.max(controls.maxDistance, distance * 1.3);
+        if (camera.far < distance * 2) { camera.far = distance * 2; camera.updateProjectionMatrix(); }
+        return distance / R - 1;
+    }
+
+    function setGroup(id, value, byVisitor) {
+        on[id] = value;
+        groupChips.forEach(function (c) { if (c.dataset.group === id) setChip(c, value); });
+        if (id === 'stations') {
+            stationsOn = value;
+            updateMarkers();
+            renderPaths();
+        } else if (value) {
+            loadCloud();
+            var g = groupById(id);
+            if (g.shellKm) {
+                var altitude = altitudeToSee(g);
+                // Only the first time, so it doesn't fight a visitor who has since zoomed back in.
+                if (byVisitor && !cloud.eased && globe.pointOfView().altitude < altitude) {
+                    cloud.eased = true;
+                    controls.autoRotate = false;
+                    if (sky.state.following) sky.setFollowing(false);
+                    globe.pointOfView({ altitude: altitude }, reduceMotion ? 0 : 1500);
+                }
+            }
+            cloudTick();
+        }
+        if (cloud.label && !on[cloud.label.group]) hideLabel();
+        showGroups();
+    }
+
+    var STORE_KEY = 'tis.globe.groups';
+    function saveGroups() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(on)); } catch (e) { /* private mode: just don't remember */ }
+    }
+
+    groupChips.forEach(function (c) {
+        c.disabled = false;
+        c.addEventListener('click', function () {
+            var id = c.dataset.group;
+            setGroup(id, !on[id], true);
+            saveGroups();
+        });
+    });
+
+    // ---- Tap a dot: a small label with its name (the nearest visible dot within a few pixels) ----
+    // How close a tap must be to a dot, in CSS pixels. Fingers get more room than a mouse.
+    var PICK_PX = 10, PICK_PX_TOUCH = 16;
+    var Vec3 = globe.camera().position.constructor;
+    var pickV = new Vec3(), camV = new Vec3();
+
+    function hideLabel() {
+        cloud.label = null;
+        updateMarkers();
+    }
+
+    function moveLabel() {
+        var l = cloud.label;
+        if (!l) return;
+        var a = groupById(l.group).attr.array, i = l.index * 3;
+        var geo = globe.toGeoCoords({ x: a[i], y: a[i + 1], z: a[i + 2] });
+        l.lng = l.lng === null ? geo.lng : sky.unwrapNear(geo.lng, l.lng);
+        l.lat = geo.lat;
+        l.alt = geo.altitude;
+    }
+
+    function pick(clientX, clientY, radius) {
+        var camera = globe.camera(), rect = el.getBoundingClientRect(), R = globe.getGlobeRadius();
+        camV.setFromMatrixPosition(camera.matrixWorld);
+        var best = null, bestD = radius * radius;
+        GROUPS.forEach(function (g) {
+            var pts = pointsOf(g);
+            if (!pts || !pts.visible || !g.attr) return;
+            var a = g.attr.array;
+            for (var i = 0; i < a.length; i += 3) {
+                if (a[i] === 0 && a[i + 1] === 0 && a[i + 2] === 0) continue;
+                pickV.set(a[i], a[i + 1], a[i + 2]).applyMatrix4(pts.matrixWorld);
+                // Behind the Earth: the line from the camera to the dot passes through the globe.
+                var dx = pickV.x - camV.x, dy = pickV.y - camV.y, dz = pickV.z - camV.z;
+                var t = -(camV.x * dx + camV.y * dy + camV.z * dz) / (dx * dx + dy * dy + dz * dz);
+                if (t > 0 && t < 1) {
+                    var cx = camV.x + t * dx, cy = camV.y + t * dy, cz = camV.z + t * dz;
+                    if (cx * cx + cy * cy + cz * cz < R * R) continue;
+                }
+                pickV.project(camera);
+                if (pickV.z > 1) continue;
+                var sx = (pickV.x + 1) / 2 * rect.width + rect.left, sy = (1 - pickV.y) / 2 * rect.height + rect.top;
+                var d = (sx - clientX) * (sx - clientX) + (sy - clientY) * (sy - clientY);
+                if (d < bestD) { bestD = d; best = { group: g.id, index: i / 3 }; }
+            }
+        });
+        return best;
+    }
+
+    var down = null;
+    el.addEventListener('pointerdown', function (e) {
+        down = e.target.tagName === 'CANVAS' ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+    });
+    el.addEventListener('pointerup', function (e) {
+        // A tap, not the end of a drag.
+        var tap = down && Math.abs(e.clientX - down.x) <= 5 && Math.abs(e.clientY - down.y) <= 5 && Date.now() - down.t < 600;
+        down = null;
+        if (!tap || !cloud.loaded) return;
+        var hit = pick(e.clientX, e.clientY, e.pointerType === 'touch' ? PICK_PX_TOUCH : PICK_PX);
+        if (!hit) { if (cloud.label) hideLabel(); return; }
+        var node = document.createElement('div');
+        node.className = 'globe-dot-label';
+        node.appendChild(document.createElement('span')).textContent = groupById(hit.group).names[hit.index];
+        cloud.label = { node: node, group: hit.group, index: hit.index, lat: 0, lng: null, alt: 0 };
+        moveLabel();
+        updateMarkers();
+    });
+
     // ---- Camera: slow auto-rotate until the visitor grabs the globe ----
     var controls = globe.controls();
     controls.autoRotate = !reduceMotion;
@@ -715,6 +987,16 @@
     // in the background; the 'view' event resizes and resumes it when they switch back.
     if (sky.state.view !== 'globe') globe.pauseAnimation();
 
+    // Groups the visitor turned on last time (after the camera controls exist, since the shells widen the zoom).
+    var savedGroups = null;
+    try { savedGroups = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { savedGroups = null; }
+    if (savedGroups && typeof savedGroups === 'object') {
+        groupChips.forEach(function (c) {
+            var id = c.dataset.group;
+            if (typeof savedGroups[id] === 'boolean' && savedGroups[id] !== !!on[id]) setGroup(id, savedGroups[id], false);
+        });
+    }
+
     updateSun();
     sky.auroraReady.then(showAurora).catch(function () { /* map legend shows status */ });
     setInterval(function () {
@@ -730,6 +1012,7 @@
         new IntersectionObserver(function (entries) {
             entries.forEach(function (e) {
                 if (sky.state.view !== 'globe') return;
+                inView = e.isIntersecting;
                 if (e.isIntersecting) globe.resumeAnimation(); else globe.pauseAnimation();
             });
         }).observe(el);

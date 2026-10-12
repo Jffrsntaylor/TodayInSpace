@@ -276,7 +276,9 @@
                  data-globe-src="@Versioned("~/js/sky-globe.js")"
                  data-leaflet-css="@Url.Content("~/lib/leaflet/leaflet.css")"
                  data-leaflet-js="@Url.Content("~/lib/leaflet/leaflet.js")"
-                 data-map-src="@Versioned("~/js/sky-map.js")">
+                 data-map-src="@Versioned("~/js/sky-map.js")"
+                 data-sat-worker="@Versioned("~/js/sat-worker.js")"
+                 data-satellite-lib="@Url.Content("~/lib/satellite.js/satellite.min.js")">
             <div class="sky-head">
                 <div class="section-label">Live Sky</div>
                 <div class="view-toggle" role="tablist" aria-label="Live Sky view">
@@ -287,6 +289,14 @@
             <div class="sky-panel">
                 <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" data-night-texture="/img/earth-night-lights.jpg" aria-label="3D globe showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
                 <div id="sky-map" class="sky-map" hidden data-carto-key="@TodayInSpace.Web.Helpers.MapSettings.CartoKey(Config)" aria-label="World map showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
+                @* Which satellites the globe shows. Enabled by sky-globe.js; everything but Stations downloads on first use. *@
+                <div class="sat-groups" role="group" aria-label="Satellites on the globe" data-view-only="globe">
+                    <button type="button" class="chip" data-group="stations" aria-pressed="true" disabled>Stations</button>
+                    <button type="button" class="chip" data-group="starlink" aria-pressed="false" disabled>Starlink<span class="n"></span></button>
+                    <button type="button" class="chip" data-group="navigation" aria-pressed="false" disabled>Navigation<span class="n"></span></button>
+                    <button type="button" class="chip" data-group="geo" aria-pressed="false" disabled>Geostationary<span class="n"></span></button>
+                    <button type="button" class="chip" data-group="other" aria-pressed="false" disabled>Everything else<span class="n"></span></button>
+                </div>
                 <div class="sky-readout">
                     <div class="sat-title">
                         <strong id="sat-name">International Space Station</strong>
@@ -315,7 +325,7 @@
                     <span class="status" id="sky-status" role="status"></span>
                 </div>
             </div>
-            <p class="sky-note">Positions of the ISS, Hubble and Tiangong are calculated live in your browser from each one&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble; city lights: NASA Earth Observatory / Black Marble.</p>
+            <p class="sky-note">Positions of the ISS, Hubble and Tiangong are calculated live in your browser from each one&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble; city lights: NASA Earth Observatory / Black Marble. Satellite positions: CelesTrak.</p>
         </section>
 
         <footer class="foot">
