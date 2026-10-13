@@ -876,6 +876,7 @@ a { color: var(--accent); }
 .sat-groups .chip[data-group="navigation"] { --accent: #ffbe5a; }
 .sat-groups .chip[data-group="geo"] { --accent: #5fe1f0; }
 .sat-groups .chip[data-group="other"] { --accent: #afb4c3; }
+.sat-groups #pads-chip { --accent: #ff9a76; }
 /* globe.gl centres each element on its point, so the anchor is zero-size and the name sits to the right. */
 .globe-dot-label { width: 0; height: 0; pointer-events: none; }
 .globe-dot-label span {

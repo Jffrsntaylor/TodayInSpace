@@ -490,6 +490,8 @@
     // ---- Launch pads: a small rocket at each upcoming launch's pad, the next one labeled ----
     var HOUR = 3600000;
     var pads = { upcoming: [], list: [], key: '', next: null };
+    var padsOn = true;
+    var padsChip = document.getElementById('pads-chip');
 
     // "Falcon 9 Block 5 | Starlink Group 15-25" -> "Falcon 9 · Starlink 15-25", short enough to sit on the globe.
     function shortLaunchName(name) {
@@ -513,6 +515,8 @@
     // Rebuilt only when the launches still to come change (one flies, or the data loads), so an open card
     // isn't closed under the visitor's finger every minute.
     function updatePads() {
+        // Turned off: nothing to build or keep up to date until the chip turns them back on.
+        if (!padsOn) return;
         var now = Date.now();
         // Same rule as the Launches card: a launch stays for an hour after T-0, then the next one takes over.
         var coming = pads.upcoming.filter(function (l) { return Date.parse(l.net) > now - HOUR; });
@@ -535,6 +539,7 @@
             byPad[id].launches.push(l);
         });
         pads.list.forEach(buildPad);
+        chipCount(padsChip, ' · ' + pads.list.length);
         updatePadLabel();
         updateMarkers();
     }
@@ -619,6 +624,7 @@
 
     sky.launchesReady.then(function (upcoming) {
         pads.upcoming = upcoming;
+        if (padsChip) padsChip.hidden = !upcoming.some(hasPad);
         updatePads();
     }).catch(function () { /* no launch data: no pads */ });
 
@@ -665,7 +671,7 @@
         { id: 'other', color: 'rgba(175, 180, 195, 0.55)' }
     ];
     var groupChips = document.querySelectorAll('.sat-groups [data-group]');
-    var on = { stations: true };
+    var on = { stations: true, pads: true };
 
     // Points are drawn in device pixels, so scale up on high-DPI screens to stay ~1.5 CSS px.
     var POINT_SIZE = 1.5 * Math.min(window.devicePixelRatio || 1, 2);
@@ -848,6 +854,27 @@
         });
     });
 
+    // Off removes the pads, the next launch's label and any open card. On rebuilds them from the
+    // launches already loaded.
+    function setPads(value) {
+        padsOn = on.pads = value;
+        setChip(padsChip, value);
+        pads.list.forEach(function (p) { setPadOpen(p, false); });
+        el.classList.remove('has-pad-card');
+        pads.list = [];
+        pads.key = '';
+        chipCount(padsChip, '');
+        if (value) updatePads();
+        updateMarkers();
+    }
+
+    if (padsChip) {
+        padsChip.addEventListener('click', function () {
+            setPads(!padsOn);
+            saveGroups();
+        });
+    }
+
     // ---- Tap a dot: a small label with its name (the nearest visible dot within a few pixels) ----
     // How close a tap must be to a dot, in CSS pixels. Fingers get more room than a mouse.
     var PICK_PX = 10, PICK_PX_TOUCH = 16;
@@ -995,6 +1022,8 @@
             var id = c.dataset.group;
             if (typeof savedGroups[id] === 'boolean' && savedGroups[id] !== !!on[id]) setGroup(id, savedGroups[id], false);
         });
+        // Saved before the pads had a chip: no key, so they stay on.
+        if (padsChip && savedGroups.pads === false) setPads(false);
     }
 
     updateSun();
