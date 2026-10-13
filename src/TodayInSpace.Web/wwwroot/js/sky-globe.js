@@ -680,7 +680,12 @@
         .particlesList(function () { return []; })
         .particlesSize(function () { return POINT_SIZE; })
         .particlesSizeAttenuation(false)
-        .particlesColor('color');
+        .particlesColor('color')
+        // globe.gl's hover looks up the datum under the pointer in particlesList, which is empty here, so its
+        // tooltip would read .name off undefined and the throw kills globe.gl's render loop (the globe froze on
+        // wheel-zoom over Starlink). Keep the dots out of its pointer handling; pick() below names a tapped dot.
+        .particleLabel(function () { return ''; })
+        .pointerEventsFilter(function (obj) { return obj.__globeObjType !== 'particles'; });
 
     // globe.gl builds one three.js Points object per group; their position buffers are then filled directly
     // from the worker's Float32Arrays, which skips globe.gl's per-point objects entirely.
