@@ -293,7 +293,13 @@
                 </div>
             </div>
             <div class="sky-panel">
-                <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" data-night-texture="/img/earth-night-lights.jpg" aria-label="3D globe showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
+                @* The globe plus what floats on it. sky-globe.js moves this whole box into #globe-full for full screen. *@
+                <div class="globe-shell" id="globe-shell" data-view-only="globe">
+                    <div id="sky-globe" class="sky-globe" data-earth-texture="/img/earth-blue-marble.jpg" data-night-texture="/img/earth-night-lights.jpg" aria-label="3D globe showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their orbits, and tonight's aurora forecast. Drag to rotate."><p class="sky-loading">Loading 3D globe&hellip;</p></div>
+                    @* Both shown by sky-globe.js once the globe is up. *@
+                    <span class="globe-live" id="globe-live" hidden><span class="globe-live__dot" aria-hidden="true"></span>Live</span>
+                    <button type="button" class="globe-fs" id="globe-fs" aria-label="Show the globe full screen" hidden><span aria-hidden="true">&#x2922;</span> Fullscreen</button>
+                </div>
                 <div id="sky-map" class="sky-map" hidden data-carto-key="@TodayInSpace.Web.Helpers.MapSettings.CartoKey(Config)" aria-label="World map showing the International Space Station, the Hubble Space Telescope and the Tiangong space station, their ground tracks, tonight's aurora forecast, and the part of Earth currently in darkness."></div>
                 @* Which satellites the globe shows. Enabled by sky-globe.js; everything but Stations downloads on first use. *@
                 <div class="sat-groups" role="group" aria-label="Satellites on the globe" data-view-only="globe">
@@ -318,20 +324,28 @@
                     <div class="stat"><span class="k">Longitude</span><span class="v" id="sat-lon">&mdash;</span></div>
                     <div class="stat"><span class="k">Altitude</span><span class="v" id="sat-alt">&mdash;</span></div>
                     <div class="stat"><span class="k">Speed</span><span class="v" id="sat-speed">&mdash;</span></div>
+                    @* The clock and the orbit data's age are filled in by sky-core.js every second. *@
+                    <div class="sky-live">
+                        <span class="sky-utc" id="sky-utc"></span>
+                        <span class="sky-epoch" id="sat-epoch"></span>
+                        <span class="sky-how">Computed with <partial name="_ExplainTerm" model="Glossary.Sgp4" /></span>
+                    </div>
+                    <partial name="_Explainer" model="Glossary.Sgp4" />
                 </div>
                 <div class="sky-legend">
                     <span><span class="line"></span>ISS orbit</span>
-                    <span><span class="line" style="border-color:#ffc46b"></span>Hubble orbit</span>
-                    <span><span class="line" style="border-color:#5fd3e6"></span>Tiangong orbit</span>
-                    <span><span class="sw" style="background:#35d49a"></span>Aurora 5&ndash;15%</span>
-                    <span><span class="sw" style="background:#7dffb3"></span>15&ndash;30%</span>
-                    <span><span class="sw" style="background:#ffd166"></span>30&ndash;50%</span>
-                    <span><span class="sw" style="background:#ff5d8f"></span>50%+</span>
-                    <span data-view-only="map" hidden><span class="sw" style="background:#00030d;border:1px solid rgba(255,255,255,.25)"></span>Night side</span>
+                    <span><span class="line line--hubble"></span>Hubble orbit</span>
+                    <span><span class="line line--tiangong"></span>Tiangong orbit</span>
+                    <span><span class="sw sw--aurora-1"></span>Aurora 5&ndash;15%</span>
+                    <span><span class="sw sw--aurora-2"></span>15&ndash;30%</span>
+                    <span><span class="sw sw--aurora-3"></span>30&ndash;50%</span>
+                    <span><span class="sw sw--aurora-4"></span>50%+</span>
+                    <span data-view-only="map" hidden><span class="sw sw--night"></span>Night side</span>
                     <span class="sky-hint" data-view-only="globe">Drag to spin &middot; scroll or pinch to zoom &middot; click a satellite</span>
                     <span class="status" id="sky-status" role="status"></span>
                 </div>
             </div>
+            <p class="sky-check">Check it: <a href="https://spotthestation.nasa.gov/" target="_blank" rel="noopener">NASA Spot the Station</a> &middot; <a href="https://www.nasa.gov/live/" target="_blank" rel="noopener">Watch the ISS live from orbit</a></p>
             <p class="sky-note">Positions of the ISS, Hubble and Tiangong are calculated live in your browser from each one&rsquo;s latest orbital elements (CelesTrak), at true altitude. Aurora forecast from NOAA&rsquo;s OVATION model, valid around <span id="aurora-time">&mdash;</span>. Earth imagery: NASA Blue Marble; city lights: NASA Earth Observatory / Black Marble. Satellite positions: CelesTrak.</p>
         </section>
 
@@ -342,6 +356,15 @@
 
     </div>
     <button type="button" class="to-top" id="to-top" aria-label="Back to top" hidden>&uarr;</button>
+    @* Full-screen globe. Empty until sky-globe.js moves the globe, the satellite picker, the chips and the
+       readout into it, and puts them back on close. A CSS overlay rather than only the Fullscreen API,
+       which iPhones don't have for anything but video. *@
+    <div class="globe-full" id="globe-full" role="dialog" aria-modal="true" aria-label="Live Sky globe, full screen" hidden>
+        <button type="button" class="globe-full__close" id="globe-full-close" aria-label="Close full screen">&#x2715;</button>
+        <div class="globe-full__bar" id="globe-full-bar">
+            <button type="button" class="globe-full__more" id="globe-full-more" aria-expanded="false" aria-label="Show the readout and satellite groups">&#x25B2;</button>
+        </div>
+    </div>
     <script src="~/lib/satellite.js/satellite.min.js"></script>
     <script src="~/js/sky-core.js" asp-append-version="true"></script>
     <script src="~/js/sky-loader.js" asp-append-version="true"></script>

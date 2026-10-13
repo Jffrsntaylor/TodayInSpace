@@ -8,7 +8,7 @@ namespace TodayInSpace.Web.Tests
         [Fact]
         public void EveryEntry_HasAUniqueIdAndSomeText()
         {
-            Assert.Equal(4, Glossary.All.Count);
+            Assert.Equal(5, Glossary.All.Count);
             Assert.Equal(Glossary.All.Count, Glossary.All.Select(e => e.Id).Distinct().Count());
             Assert.All(Glossary.All, e =>
             {
@@ -36,6 +36,26 @@ namespace TodayInSpace.Web.Tests
         public void LearnMore_PointsAtNoaaSwpc()
         {
             Assert.Equal("https://www.swpc.noaa.gov/", Glossary.LearnMoreUrl);
+            Assert.All(Glossary.All.Where(e => e != Glossary.Sgp4), e =>
+            {
+                Assert.Equal(Glossary.LearnMoreUrl, e.LearnMoreUrl);
+                Assert.Equal("NOAA SWPC", e.LearnMoreSource);
+            });
+        }
+
+        [Fact]
+        public void Sgp4_LinksToCelesTrakNotNoaa()
+        {
+            Assert.Equal("CelesTrak", Glossary.Sgp4.LearnMoreSource);
+            Assert.StartsWith("https://celestrak.org/", Glossary.Sgp4.LearnMoreUrl);
+        }
+
+        [Fact]
+        public void Sgp4_KeepsTheAccuracyClaimModest()
+        {
+            // Public TLEs with SGP4 are good to kilometers, not meters. Don't let the wording drift into overclaiming.
+            Assert.Contains("a few kilometers", Glossary.Sgp4.Text);
+            Assert.DoesNotMatch(@"(?i)\bmet(er|re)s?\b", Glossary.Sgp4.Text);
         }
     }
 }

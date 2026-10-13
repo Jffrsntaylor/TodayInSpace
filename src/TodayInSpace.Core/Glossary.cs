@@ -3,11 +3,13 @@ namespace TodayInSpace.Core
     // One step of NOAA's geomagnetic storm scale, e.g. Kp 5 = G1 minor.
     public sealed record StormLevel(int Kp, string GScale, string Name);
 
-    // A plain-language explanation of a space-weather term.
+    // A plain-language explanation of a term.
     // Scale is only set for Kp, which shows NOAA's storm scale as a small legend.
-    public sealed record GlossaryEntry(string Id, string Term, string Text, IReadOnlyList<StormLevel>? Scale = null);
+    // Most entries are space weather, so "Learn more" goes to NOAA unless an entry says otherwise.
+    public sealed record GlossaryEntry(string Id, string Term, string Text, IReadOnlyList<StormLevel>? Scale = null,
+        string LearnMoreUrl = Glossary.LearnMoreUrl, string LearnMoreSource = "NOAA SWPC");
 
-    // The words behind the ⓘ buttons on the Space Weather card. They live here, not in the views,
+    // The words behind the ⓘ buttons on the Space Weather card and Live Sky. They live here, not in the views,
     // so the site and a future app endpoint (/api/glossary) explain things the same way.
     public static class Glossary
     {
@@ -45,6 +47,14 @@ namespace TodayInSpace.Core
             "NOAA’s forecast of the highest Kp expected each day. It’s a forecast, so big storms can arrive " +
             "earlier or later than predicted.");
 
-        public static readonly IReadOnlyList<GlossaryEntry> All = [Kp, Aurora, SolarWind, KpForecast];
+        // Under the Live Sky readout. Keep the claim modest: SGP4 from public elements is good to a few km
+        // near the element set's epoch and drifts as it ages, which is why the readout shows that age.
+        public static readonly GlossaryEntry Sgp4 = new("sgp4", "SGP4",
+            "Positions are computed live in your browser with SGP4, the standard model NORAD and NASA trackers " +
+            "use, from the latest public orbital elements. Typical error is a few kilometers, smaller than the " +
+            "dot at this zoom.",
+            LearnMoreUrl: "https://celestrak.org/publications/AIAA/2006-6753/", LearnMoreSource: "CelesTrak");
+
+        public static readonly IReadOnlyList<GlossaryEntry> All = [Kp, Aurora, SolarWind, KpForecast, Sgp4];
     }
 }
