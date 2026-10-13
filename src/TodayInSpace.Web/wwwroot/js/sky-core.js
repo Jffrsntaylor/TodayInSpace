@@ -510,6 +510,41 @@ window.TISSky = (function () {
         $('sat-lon').textContent = Math.abs(p.lon).toFixed(2) + '° ' + (p.lon >= 0 ? 'E' : 'W');
         $('sat-alt').textContent = fmt.format(p.alt) + ' km';
         $('sat-speed').textContent = p.speed ? fmt.format(p.speed) + ' km/h' : '—';
+        showEpoch();
+    }
+
+    // Ticks every second next to the coordinates, so it's plain the numbers are for right now.
+    function showUtc(now) {
+        var utc = $('sky-utc');
+        if (utc) utc.textContent = now.toISOString().slice(11, 19) + ' UTC';
+    }
+
+    // SGP4 is most accurate near the element set's epoch and drifts a few km a day after it, so the
+    // epoch's age is shown, and called out once it's old enough that the dot may be noticeably off.
+    var EPOCH_STALE_DAYS = 3;
+
+    // Julian date -> ms since 1970. satellite.js keeps the TLE epoch (line 1, cols 19-32) as jdsatepoch.
+    function epochOf(id) {
+        var rec = satrecs[id];
+        return rec && rec.jdsatepoch ? (rec.jdsatepoch - 2440587.5) * 86400000 : null;
+    }
+
+    // "12 min ago", "3 h ago", "2 days ago". Short, because it shares a line with the clock on phones.
+    function shortAgo(ms) {
+        var minutes = Math.max(0, Math.floor(ms / 60000));
+        if (minutes < 60) return minutes + ' min ago';
+        var hours = Math.floor(minutes / 60);
+        if (hours < 48) return hours + ' h ago';
+        return Math.floor(hours / 24) + ' days ago';
+    }
+
+    function showEpoch() {
+        var span = $('sat-epoch'), epoch = epochOf(state.selected);
+        if (!span || epoch === null) return;
+        var age = Date.now() - epoch;
+        span.textContent = 'Orbit data: CelesTrak · element set from ' + shortAgo(age);
+        span.title = 'Element set epoch ' + new Date(epoch).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+        span.classList.toggle('stale', age > EPOCH_STALE_DAYS * 86400000);
     }
 
     function select(id) {
@@ -562,6 +597,7 @@ window.TISSky = (function () {
         });
         var follow = $('sat-follow');
         if (follow) follow.addEventListener('click', function () { setFollowing(!state.following); });
+        showUtc(new Date());
     });
 
     satsReady.then(function (failed) {
@@ -575,6 +611,7 @@ window.TISSky = (function () {
     setInterval(function () {
         if (document.hidden) return;
         tick++;
+        showUtc(new Date());
         updateReadout();
         emit('tick');
         if (tick % 60 === 0) emit('minute');

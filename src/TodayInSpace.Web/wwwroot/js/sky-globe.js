@@ -965,9 +965,28 @@
         if (p) globe.pointOfView({ lat: p.lat, lng: p.lon, altitude: Math.max(globe.pointOfView().altitude, 1.5) }, ms);
     }
 
+    // Camera altitude (in Earth radii) at which the Earth spans `fill` of the box's shorter side. The camera's
+    // fov is vertical, so on a tall phone box it's the horizontal half-angle that limits the Earth's size.
+    function altitudeToFill(fill) {
+        // The Earth's edge is where the line of sight grazes it: sin(angle) = R / distance.
+        var edge = Math.atan(fill * halfViewTan());
+        return 1 / Math.sin(edge) - 1;
+    }
+
+    // The reverse: how much of the shorter side the Earth spans at this altitude, for a box whose
+    // halfViewTan() was `tan` (the box's size before a resize).
+    function fillAt(altitude, tan) {
+        return Math.tan(Math.asin(1 / (1 + altitude))) / tan;
+    }
+
+    function halfViewTan() {
+        var halfV = globe.camera().fov * Math.PI / 360;
+        return Math.min(Math.tan(halfV), Math.tan(halfV) * el.clientWidth / Math.max(1, el.clientHeight));
+    }
+
     // Start zoomed out, then glide to the selected satellite once its orbit data has loaded.
     var centered = false;
-    var startAltitude = el.clientWidth < 600 ? 2.1 : 1.75;
+    var startAltitude = altitudeToFill(0.8);
     globe.pointOfView({ lat: 15, lng: 0, altitude: 3.2 }, 0);
     function centerOnSelected() {
         if (centered) return;
@@ -975,6 +994,146 @@
         if (!p) return;
         centered = true;
         globe.pointOfView({ lat: Math.max(-40, Math.min(40, p.lat)), lng: p.lon, altitude: startAltitude }, reduceMotion ? 0 : 2000);
+    }
+
+    // ---- Full screen: the same globe (one WebGL context) moved into a fixed overlay ----
+    // A CSS overlay works everywhere, iPhones included. Where the Fullscreen API exists it's used on top,
+    // which also hides the browser's own bars on Android.
+    var shell = document.getElementById('globe-shell');
+    var full = {
+        open: false,
+        dialog: document.getElementById('globe-full'),
+        bar: document.getElementById('globe-full-bar'),
+        button: document.getElementById('globe-fs'),
+        close: document.getElementById('globe-full-close'),
+        more: document.getElementById('globe-full-more'),
+        // Moved in on open, put back exactly where they were on close.
+        parts: [shell, document.querySelector('.sat-groups'), document.querySelector('.sky-readout')],
+        marks: [],
+        then: null
+    };
+
+    // Inline the box's CSS sets the size; full screen it's the visual viewport, so iOS's URL bar and
+    // the on-screen keyboard don't cut off the bottom of the globe.
+    // The Earth keeps the same share of the box through any resize. Otherwise going full screen on a
+    // phone (a much taller box) pushes it past the screen's edges, and rotating the phone shrinks it.
+    var lastTan = halfViewTan();
+    function fitGlobe() {
+        if (full.open) {
+            var vv = window.visualViewport;
+            full.dialog.style.height = (vv ? vv.height : window.innerHeight) + 'px';
+        }
+        if (el.hidden) return;
+        var fill = fillAt(globe.pointOfView().altitude, lastTan);
+        globe.width(el.clientWidth).height(el.clientHeight);
+        lastTan = halfViewTan();
+        globe.pointOfView({ altitude: altitudeToFill(fill) }, 0);
+    }
+
+    function openFull() {
+        if (full.open || sky.state.view !== 'globe') return;
+        full.open = true;
+        full.marks = full.parts.map(function (part) {
+            var mark = document.createComment('globe-full');
+            part.parentNode.insertBefore(mark, part);
+            return mark;
+        });
+        full.dialog.insertBefore(shell, full.dialog.firstChild);
+        full.bar.appendChild(full.parts[1]);
+        full.bar.appendChild(full.parts[2]);
+        full.dialog.hidden = false;
+        document.documentElement.classList.add('globe-full-open');
+        // Back (button or swipe) closes it rather than leaving the page. The URL stays the same, so the
+        // section nav's hash links are untouched.
+        history.pushState({ globeFull: true }, '');
+        if (full.dialog.requestFullscreen) full.dialog.requestFullscreen().catch(function () { /* the overlay is enough */ });
+        fitGlobe();
+        inView = true;
+        globe.resumeAnimation();
+        full.close.focus();
+        // Following makes the motion obvious: the ISS crosses about a degree of longitude every 15 seconds.
+        if (!sky.state.following) sky.setFollowing(true);
+    }
+
+    // fromHistory: Back was pressed, so the history entry is already gone.
+    function closeFull(fromHistory) {
+        if (!full.open) return;
+        full.open = false;
+        if (document.fullscreenElement) document.exitFullscreen().catch(function () { });
+        full.parts.forEach(function (part, i) {
+            full.marks[i].parentNode.replaceChild(part, full.marks[i]);
+        });
+        full.marks = [];
+        full.dialog.hidden = true;
+        full.dialog.style.height = '';
+        document.documentElement.classList.remove('globe-full-open');
+        fitGlobe();
+        full.button.focus({ preventScroll: true });
+        // The page may have been scrolled away from the globe underneath; let it rest if it's not on screen.
+        var r = el.getBoundingClientRect();
+        inView = r.bottom > 0 && r.top < window.innerHeight;
+        if (!inView) globe.pauseAnimation();
+        if (!fromHistory && history.state && history.state.globeFull) history.back();
+        else afterClose();
+    }
+
+    // A link inside the overlay (a pad card's "See Launches", the pin's "See your sky") waits for the
+    // history entry to be popped, or Back would undo the jump.
+    function afterClose() {
+        var href = full.then;
+        full.then = null;
+        var target = href && document.getElementById(href.slice(1));
+        if (!target) return;
+        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+        history.replaceState(null, '', href);
+    }
+
+    full.button.addEventListener('click', openFull);
+    full.close.addEventListener('click', function () { closeFull(false); });
+    full.more.addEventListener('click', function () {
+        var expanded = full.more.getAttribute('aria-expanded') !== 'true';
+        full.more.setAttribute('aria-expanded', String(expanded));
+        full.dialog.classList.toggle('is-expanded', expanded);
+        full.more.setAttribute('aria-label', expanded ? 'Hide the readout and satellite groups' : 'Show the readout and satellite groups');
+    });
+
+    full.dialog.addEventListener('click', function (e) {
+        var link = e.target.closest('a[href^="#"]');
+        if (!link || !full.open) return;
+        e.preventDefault();
+        full.then = link.getAttribute('href');
+        closeFull(false);
+    });
+
+    window.addEventListener('popstate', function () {
+        if (full.open) closeFull(true);
+        else if (full.then) afterClose();
+    });
+
+    // Esc in browser full screen is taken by the browser, which leaves full screen; follow it out.
+    document.addEventListener('fullscreenchange', function () {
+        if (!document.fullscreenElement && full.open) closeFull(false);
+    });
+
+    // Capture phase, so an open ⓘ explainer gets the first Esc (explainers.js closes it) and the second closes the overlay.
+    window.addEventListener('keydown', function (e) {
+        if (!full.open) return;
+        if (e.key === 'Escape') {
+            if (!full.dialog.querySelector('.explainer:not([hidden])')) closeFull(false);
+        } else if (e.key === 'Tab') {
+            trapFocus(e);
+        }
+    }, true);
+
+    // Keep Tab inside the dialog while it's open.
+    function trapFocus(e) {
+        var items = Array.prototype.filter.call(
+            full.dialog.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])'),
+            function (n) { return !n.disabled && n.getClientRects().length > 0; });
+        if (!items.length) return;
+        var first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
 
     // ---- Wire up ----
@@ -1007,7 +1166,7 @@
             if (sky.state.following) { controls.autoRotate = false; lookAtSelected(800); }
         } else if (type === 'view') {
             if (sky.state.view === 'globe') {
-                globe.width(el.clientWidth).height(el.clientHeight);
+                fitGlobe();
                 globe.resumeAnimation();
             } else {
                 globe.pauseAnimation();
@@ -1018,6 +1177,9 @@
     // The globe loads lazily, so the visitor may already be on the map. Don't render
     // in the background; the 'view' event resizes and resumes it when they switch back.
     if (sky.state.view !== 'globe') globe.pauseAnimation();
+
+    full.button.hidden = false;
+    document.getElementById('globe-live').hidden = false;
 
     // Groups the visitor turned on last time (after the camera controls exist, since the shells widen the zoom).
     var savedGroups = null;
@@ -1039,13 +1201,23 @@
     }, 10 * 60 * 1000);
 
     // Keep the canvas sized to its box; pause rendering while scrolled out of view to save battery.
-    window.addEventListener('resize', function () {
-        if (!el.hidden) globe.width(el.clientWidth).height(el.clientHeight);
-    });
+    // Some phones report a rotation before the viewport has its new size, so check again a moment later.
+    // fitGlobe keeps the Earth's share of the box, so running it twice changes nothing the second time.
+    var refit = null;
+    function onResize() {
+        fitGlobe();
+        clearTimeout(refit);
+        refit = setTimeout(fitGlobe, 300);
+    }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    // The iOS URL bar sliding in and out changes only the visual viewport.
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
     if ('IntersectionObserver' in window) {
         new IntersectionObserver(function (entries) {
             entries.forEach(function (e) {
-                if (sky.state.view !== 'globe') return;
+                // Full screen it's always in view, whatever the page behind it is scrolled to.
+                if (sky.state.view !== 'globe' || full.open) return;
                 inView = e.isIntersecting;
                 if (e.isIntersecting) globe.resumeAnimation(); else globe.pauseAnimation();
             });
