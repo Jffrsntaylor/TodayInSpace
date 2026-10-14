@@ -2,37 +2,75 @@
 
 ### [Open the live site →](https://space.evergreensystemswa.com/)
 
-A web app I built that shows NASA's Astronomy Picture of the Day, the chance of seeing the northern lights, and a 3D globe that tracks the International Space Station and the Hubble Space Telescope in real time.
+Everything worth looking up at tonight, for where you are. A web app I built that tracks the International Space Station and every active satellite in real time, tells you when you can see them from your zip code, and keeps an eye on space weather, launches and the people in orbit — plus NASA's Astronomy Picture of the Day.
 
-![Today in Space homepage](docs/apod.jpg)
+![Today in Space homepage](docs/home.jpg)
 
-![Live globe tracking the ISS and Hubble](docs/globe.jpg)
+## Live Sky: a real-time 3D globe
 
-## What you can do on the site
+![The globe with the Starlink shell, the next launch's pad and your location](docs/live-sky-starlink.jpg)
 
-- See today's space photo from NASA
-- Check the space weather and how likely the aurora is tonight
-- Spin the globe and watch the ISS, Hubble and China's Tiangong station move along their orbits (click one to follow it)
-- Go back to any past day in the archive
+- The ISS, Hubble and China's Tiangong station move along their real orbits, computed live in your browser from each one's latest orbital elements with SGP4 (the standard model satellite trackers use).
+- Turn on **all ~16,000 active satellites**: the Starlink shell, the GPS/navigation satellites 20,000 km up, and the geostationary ring at 36,000 km. They're drawn as one GPU point cloud and propagated in a Web Worker, so the page stays smooth.
+- City lights glow on the night side, the aurora oval glows over the poles from NOAA's forecast, and upcoming launch pads show a countdown.
+- Your location, your next visible ISS pass, and the circle of Earth that can see the ISS right now.
+- Full-screen mode, a flat map view, and a live readout of latitude, longitude, altitude and speed.
+
+![Zoomed out: GPS satellites and the geostationary ring](docs/live-sky-orbits.jpg)
+
+## Your sky this week
+
+Enter a zip code (or use your location) and get the ISS and Tiangong passes you can actually see over the next 7 days — when, which direction, how high, and how cloudy it'll be — plus the planets and Moon tonight and your odds of seeing the aurora from your latitude.
+
+![Visible passes, planets, aurora odds and cloud cover for one location](docs/your-sky.jpg)
+
+## People, launches and satellites
+
+Who's in space right now and on which station, the next launch with a live countdown, every orbital launch attempt this year by provider, and how many satellites are up there and whose they are.
+
+![People in space, launches and satellite counts](docs/people-launches-satellites.jpg)
+
+## Space weather, explained
+
+The Kp index, aurora chance, solar wind and NOAA's 3-day forecast — each with a plain-English explanation, because most people don't know what a Kp index is.
+
+![Space weather cards](docs/space-weather.jpg)
+
+## A live picture of Earth
+
+The server draws an image of Earth right now — day and night, city lights, the aurora and the ISS — centered on any location. It powers an iPhone home-screen widget and the site's link previews.
+
+<img src="docs/earth-snapshot.png" alt="Server-rendered snapshot of Earth centered on Olympia, WA" width="320">
+
+## Every day is saved
+
+The daily picture and space weather are archived, so you can go back to any past day.
+
+![Forecast archive](docs/archive.jpg)
 
 ## How it works
 
-- An **Azure Function** runs every morning. It pulls the photo from NASA and the space weather from NOAA, then saves that day's data and a copy of the image to **Azure Blob Storage**.
-- The website is **ASP.NET Core MVC (C#)**. It reads from storage instead of calling NASA on every page load, so it stays fast and every past day is kept.
-- The globe works out where each satellite is right in the browser, using its latest orbit data (JavaScript with globe.gl and satellite.js).
-- `/healthz` reports whether the site can read storage and whether the daily update ran on time, so I can catch a NASA outage before a visitor does.
-- **GitHub Actions** builds the project, runs the tests, and deploys to Azure every time I push to `main`.
-- Infrastructure is defined in `infra/` (Bicep).
+- **Azure Functions** on timers do all the fetching, so the website never waits on (or overloads) another service: the daily digest from NASA and NOAA twice a day, people in space every 3 hours and launches every hour from The Space Devs, and satellite data from CelesTrak every 6 hours (only downloading it when it has changed). Results are saved to **Azure Blob Storage**.
+- The website is **ASP.NET Core MVC on .NET 10**, hosted on **Azure App Service (Linux)**. Every feature has its own JSON API (`/api/sky/...`), so a mobile app can use the same data later.
+- **Orbit math** runs in two places: in the browser (satellite.js) for the live globe, and on the server (SGP.NET) for visible-pass predictions. The SGP4 implementation is checked against Vallado's published reference vectors. The Sun, Moon and planets come from Astronomy Engine.
+- The **Earth image** is rendered on the server with SkiaSharp (an orthographic projection of NASA's Blue Marble and Black Marble imagery).
+- **Privacy:** your location is rounded to about 1 km in the browser before it's sent, rounded again on the server, and never logged. Location lookups are rate-limited.
+- `/healthz` reports whether the site can read storage and whether the daily update ran on time.
+- **GitHub Actions** builds, runs 340+ automated tests (xUnit), and deploys on every merge to `main`. Infrastructure is defined in Bicep (`infra/`). It runs for about $13 a month.
 
-**Built with:** C#, .NET, ASP.NET Core MVC, Azure App Service, Azure Functions, Azure Blob Storage, JavaScript, xUnit, GitHub Actions
+**Built with:** C#, .NET 10, ASP.NET Core MVC, Azure App Service, Azure Functions, Azure Blob Storage, JavaScript, globe.gl / three.js, satellite.js, SGP.NET, Astronomy Engine, SkiaSharp, xUnit, GitHub Actions, Bicep
+
+## How I built it
+
+I build this the way a lead works with a team. I decide what the site should do, plan each feature, check the data sources, and review and merge every change myself. I use Claude (Anthropic) as an AI pair programmer: it helps me plan features and writes much of the code through Claude Code, and most of the commits it helped with are marked `Co-Authored-By: Claude`. The aurora prediction model I'm working on next is my own code.
 
 ## Background
 
-This started as my team's final project for CS 350 at SPSCC. Since then I've kept building on it on my own: I took out the sign-up wall so anyone can use it, moved it to one server, started saving the photos so the archive doesn't break when NASA changes links, and added the live globe.
+This started as my team's final project for CS 350 at SPSCC. Since then I've kept building on it on my own: I took out the sign-up wall so anyone can use it, started saving the photos so the archive doesn't break when NASA changes links, moved it to my company's Azure account with its own domain, and added the live globe, satellite tracking, launches and "Your sky this week".
 
 ## Running it yourself
 
-You'll need the .NET 10 SDK (and Azure Functions Core Tools to run the function locally).
+You'll need the .NET 10 SDK (and Azure Functions Core Tools to run the functions locally).
 
 ```bash
 cd src/TodayInSpace.Web
@@ -47,4 +85,4 @@ Run the tests with `dotnet test TodayInSpace.slnx`.
 
 ---
 
-Data from [NASA APOD](https://api.nasa.gov/), [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/), and [CelesTrak](https://celestrak.org/). Map tiles © OpenStreetMap contributors © CARTO. Earth imagery: NASA Blue Marble.
+Data from [NASA APOD](https://api.nasa.gov/), [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/), [CelesTrak](https://celestrak.org/), [The Space Devs](https://thespacedevs.com/), the [National Weather Service](https://www.weather.gov/), the [U.S. Census Bureau](https://www.census.gov/) and [GeoNames](https://www.geonames.org/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Map tiles © OpenStreetMap contributors © CARTO. Earth imagery: NASA Blue Marble; city lights: NASA Earth Observatory / Black Marble.
