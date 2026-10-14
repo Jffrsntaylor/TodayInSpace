@@ -62,11 +62,15 @@ The daily picture and space weather are archived, so you can go back to any past
 
 ## How I built it
 
-I build this the way a lead works with a team. I decide what the site should do, plan each feature, check the data sources, and review and merge every change myself. I use Claude (Anthropic) as an AI pair programmer: it helps me plan features and writes much of the code through Claude Code, and most of the commits it helped with are marked `Co-Authored-By: Claude`. The aurora prediction model I'm working on next is my own code.
+I am the sole developer and maintainer of Today in Space. I designed, built, deployed, and have maintained the application since March.
+
+I use AI-assisted workflows to help with planning, implementation, and debugging. I make the technical decisions, review changes, and maintain the deployed application. AI contributions are documented through co-author attribution in the commit history.
 
 ## Background
 
-This started as my team's final project for CS 350 at SPSCC. Since then I've kept building on it on my own: I took out the sign-up wall so anyone can use it, started saving the photos so the archive doesn't break when NASA changes links, moved it to my company's Azure account with its own domain, and added the live globe, satellite tracking, launches and "Your sky this week".
+This started as my class project for CS 350 at SPSCC: a timer-triggered Azure Function making API calls for astronomy and space-weather data. I was the only person who worked on the implementation.
+
+Since then, I have grown it into a public application. I removed the sign-up wall, added stored copies of images to protect the archive from broken upstream links, moved hosting to my company's Azure account and domain, and built the live globe, satellite tracking, launch information, and location-based sky views.
 
 ## Running it yourself
 
