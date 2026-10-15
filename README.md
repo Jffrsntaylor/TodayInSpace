@@ -2,7 +2,7 @@
 
 ### [Open the live site →](https://space.evergreensystemswa.com/)
 
-Everything worth looking up at tonight, for where you are. A web app I built that tracks the International Space Station and every active satellite in real time, tells you when you can see them from your zip code, and keeps an eye on space weather, launches and the people in orbit — plus NASA's Astronomy Picture of the Day.
+Everything worth looking up at tonight, for where you are. A web app I built that tracks the International Space Station and every active satellite in real time, tells you when you can see them from your zip code, and keeps an eye on space weather, launches and the people in orbit and NASA's Astronomy Picture of the Day.
 
 ![Today in Space homepage](docs/home.jpg)
 
@@ -68,7 +68,7 @@ I use AI-assisted workflows to help with planning, implementation, and debugging
 
 ## Background
 
-This started as my class project for CS 350 at SPSCC: a timer-triggered Azure Function making API calls for astronomy and space-weather data. I was the only person who worked on the implementation.
+This started as my class project for CS 350 at SPSCC: a timer-triggered Azure Function making API calls for astronomy and space-weather data.
 
 Since then, I have grown it into a public application. I removed the sign-up wall, added stored copies of images to protect the archive from broken upstream links, moved hosting to my company's Azure account and domain, and built the live globe, satellite tracking, launch information, and location-based sky views.
 
